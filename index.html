@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CompiLinda</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1 id="title">CompiLinda</h1>
+            <textarea id="sourceCode" placeholder="Enter your source code here (e.g., {}$)"></textarea>
+            <button onclick="analyze()">Analyze</button>
+            <div id="errorMessage" class="error"></div>
+            <div id="lexerOutput"></div>
+    </div>
+
+    <script> var exports = {}; </script>
+    <script src="./dist/main.js"></script>
+    <script>
+        function analyze() {
+            const sourceCode = document.getElementById('sourceCode').value;
+            const outputDiv = document.getElementById('lexerOutput');
+            const errorDiv = document.getElementById('errorMessage');
+            
+            try {
+                const lexer = new Lexer(sourceCode);
+                const result = lexer.tokenize();
+                
+                errorDiv.style.display = 'none';
+                outputDiv.innerHTML = '';
+                
+                // Display logs with appropriate styling
+                result.logs.forEach(log => {
+                    const logElement = document.createElement('div');
+                    logElement.className = `log-${log.level.toLowerCase()}`;
+                    logElement.textContent = log.message;
+                    outputDiv.appendChild(logElement);
+                });
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+                outputDiv.innerHTML = '';
+            }
+        }
+    </script>
+</body>
+</html>
