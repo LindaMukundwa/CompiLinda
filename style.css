@@ -1,8 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barrio&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barrio&family=Monoton&display=swap');
 
 
 #title {
-    font-family: "Barrio", serif;
+    font-family: "Monoton", serif;
     font-weight: 400;
     font-size: 5vw;
     text-align: center;
@@ -21,7 +22,7 @@ body {
 
 .container {
     background-color: white;
-    padding: 20px;
+    padding: 40px;
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
