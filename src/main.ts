@@ -278,12 +278,6 @@ export class Lexer {
         this.addLog('DEBUG', `Lexer - ${tokenName} [ ${value} ] found at (${line}:${column})`);
     }
 
-   /*  private handleError(char: string, line: number, column: number): void {
-        this.errors++;
-        this.addLog('ERROR', `Lexer - Error:${line}:${column} Unrecognized Token: ${char})`);
-        this.advance();
-    } */
-
     private readPrintKeyword(): Token | null {
         const startColumn = this.column;
         let word = '';
