@@ -32,6 +32,11 @@ All of the source code is in the src folder. The main.ts file is the entry point
 
 After running the commands above, you can run the lexer by opening the index.html file in your browser. Make sure to use Chrome for the best experience. Paste your source code into the text area and then click the "Compile" button to run the lexer and view the tokens. 
 
+Once everything looks correct, you should get a webpage that looks like this:
+
+<img width="1456" alt="Screenshot 2025-02-16 at 16 02 27" src="https://github.com/user-attachments/assets/bb604e10-ea7f-428e-aaa4-4148efb99581" />
+
+Have fun compiling!
 
 ## Contributing
 
