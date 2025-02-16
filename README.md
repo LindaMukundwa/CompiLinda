@@ -6,11 +6,23 @@ The first version of this lexer was made with typescript and in order to make it
 
 ## Installation
 
-Make sure to clone the repository and then run the following command:
+1. Clone the repository:
+
+```bash
+git clone https://github.com/LindaMukundwa/CompiLinda
+cd CompiLinda
+```
+
+2. Install the dependecies:
+
+```bash
+npm install
+npm run build
+```
+3. Run the lexer:
 
 ```bash
 node src/main.ts
-npm install
 npm run build
 ```
 
