@@ -18,31 +18,31 @@
     <script> var exports = {}; </script>
     <script src="./dist/main.js"></script>
     <script>
-        function analyze() {
-            const sourceCode = document.getElementById('sourceCode').value;
-            const outputDiv = document.getElementById('lexerOutput');
-            const errorDiv = document.getElementById('errorMessage');
+         function analyze() {
+        const sourceCode = document.getElementById('sourceCode').value;
+        const outputDiv = document.getElementById('lexerOutput');
+        const errorDiv = document.getElementById('errorMessage');
+        
+        try {
+            const lexer = new Lexer(sourceCode);
+            const result = lexer.tokenize();
             
-            try {
-                const lexer = new Lexer(sourceCode);
-                const result = lexer.tokenize();
-                
-                errorDiv.style.display = 'none';
-                outputDiv.innerHTML = '';
-                
-                // Display logs with appropriate styling
-                result.logs.forEach(log => {
-                    const logElement = document.createElement('div');
-                    logElement.className = `log-${log.level.toLowerCase()}`;
-                    logElement.textContent = log.message;
-                    outputDiv.appendChild(logElement);
-                });
-            } catch (error) {
-                errorDiv.textContent = error.message;
-                errorDiv.style.display = 'block';
-                outputDiv.innerHTML = '';
-            }
+            errorDiv.style.display = 'none';
+            outputDiv.innerHTML = '';
+            
+            // Display logs with appropriate styling
+            result.logs.forEach(log => {
+                const logElement = document.createElement('div');
+                logElement.className = `log-${log.level.toLowerCase()}`;
+                logElement.textContent = log.message;
+                outputDiv.appendChild(logElement);
+            });
+        } catch (error) {
+            errorDiv.textContent = error.message;
+            errorDiv.style.display = 'block';
+            outputDiv.innerHTML = '';
         }
+    }
     </script>
 </body>
 </html>
