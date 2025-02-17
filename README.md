@@ -22,7 +22,6 @@ npm run build
 3. Run the lexer:
 
 ```bash
-node src/main.ts
 npm run build
 ```
 
@@ -30,7 +29,7 @@ npm run build
 
 All of the source code is in the src folder. The main.ts file is the entry point of the lexer. The lexer is a web application that allows you to compile Alan++ code into tokens.
 
-After running the commands above, you can run the lexer by opening the index.html file in your browser. Make sure to use Chrome for the best experience. Paste your source code into the text area and then click the "Compile" button to run the lexer and view the tokens. 
+After running the commands above, you can run the lexer by opening the **index.html** file in your browser. Make sure to use Chrome for the best experience. Paste your source code into the text area and then click the "Compile" button to run the lexer and view the tokens. 
 
 Once everything looks correct, you should get a webpage that looks like this:
 
