@@ -1,3 +1,5 @@
+// Main lexer file but most of the logic is in main.ts
+
 import { Token, TokenType, LexerLog } from './types';
 
 export class Lexer {

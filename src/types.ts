@@ -1,3 +1,5 @@
+// Token types for the lexer as defined in the language grammar
+
 export enum TokenType {
     // Keywords
     TYPE = 'TYPE',         // int, string, boolean

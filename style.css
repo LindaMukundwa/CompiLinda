@@ -1,3 +1,7 @@
+/*CSS file for the compiler */
+
+
+/* Importing fonts from Google Fonts */
 @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barrio&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barrio&family=Monoton&display=swap');
 @import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Barrio&family=Monoton&family=Source+Code+Pro:ital,wght@0,200..900;1,200..900&display=swap');
@@ -25,7 +29,6 @@ button:hover {
     background-color: #45a049;
 }
 
-/* Style for the error message div */
 #errorMessage {
     color: #ff0000;
     margin: 10px 0;

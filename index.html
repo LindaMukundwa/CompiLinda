@@ -10,7 +10,7 @@
     <div class="container">
         <h1 id="title">CompiLinda</h1>
             <textarea id="sourceCode" placeholder="Enter your source code here (e.g., {}$)"></textarea>
-            <button onclick="analyze()">Compile!</button>
+            <button onclick="lexer()">Compile!</button>
             <div id="errorMessage" class="error"></div>
             <div id="lexerOutput"></div>
     </div>
@@ -18,7 +18,8 @@
     <script> var exports = {}; </script>
     <script src="./dist/main.js"></script>
     <script>
-         function analyze() {
+        // Lexer function in JavaScript that uses the Lexer class from the main.ts file
+         function lexer() {
         const sourceCode = document.getElementById('sourceCode').value;
         const outputDiv = document.getElementById('lexerOutput');
         const errorDiv = document.getElementById('errorMessage');

@@ -1,3 +1,8 @@
+/**
+ * Main logic for the lexer and possibly the parser in future versions - very verbose and detailed
+ */
+
+// Token types for the lexer as defined in the language grammar
 export enum TokenType {
     // Keywords
     I_TYPE = 'I_TYPE',       // int
@@ -35,6 +40,7 @@ export enum TokenType {
     CLOSE_BLOCK = "CLOSE_BLOCK"
 }
 
+// Token interface for the lexer
 export interface Token {
     type: TokenType;
     value: string;
@@ -42,20 +48,23 @@ export interface Token {
     column: number;
 }
 
+// Lexer log interface for the lexer
 export interface LexerLog {
     level: 'INFO' | 'DEBUG' | 'ERROR' | 'WARNING';
     message: string;
 }
 
-//import { Token, TokenType, LexerLog } from './types';
-
+// Lexer log interface for the lexer
 export interface LexerLog {
     level: 'INFO' | 'DEBUG' | 'ERROR' | 'WARNING';
     message: string;
     color?: string;
 }
 
+// Lexer class for the lexer    
 export class Lexer {
+
+    // Private properties for the lexer
     private input: string;
     private position: number = 0;
     private line: number = 1;
@@ -66,22 +75,26 @@ export class Lexer {
     private programCounter: number = 1;
     private inPrintStatement: boolean = false;
     private commentDepth: number = 0;
-    private stringStartLine: number = 0;  // Track where string starts for multiline detection
+    private stringStartLine: number = 0;  // Tracks where string starts for multiline detection
     private stringStartColumn: number = 0;
 
+    // Constructor for the lexer
     constructor(input: string) {
         this.input = input;
         this.addLog('INFO', `Lexer - Lexing program ${this.programCounter}..`);
     }
 
+    // Private methods for the lexer
     private currentChar(): string {
         return this.input[this.position] || '';
     }
 
+    // Peek method for the lexer
     private peek(offset: number = 1): string {
         return this.input[this.position + offset] || '';
     }
 
+    // Advance method for the lexer
     private advance(): void {
         if (this.currentChar() === '\n') {
             this.line++;
@@ -92,17 +105,17 @@ export class Lexer {
         this.position++;
     }
 
+    // Add warning method for the lexer
     private addWarning(message: string, line: number, column: number): void {
         this.warnings++;
         this.addLog('WARNING', `Lexer - Warning:${line}:${column} ${message}`);
     }
 
-    
-
+    // Handle string method for the lexer
     private handleString(tokens: Token[]): void {
         this.stringStartLine = this.line;
         this.stringStartColumn = this.column;
-        
+
         tokens.push({
             type: TokenType.QUOTE,
             value: '"',
@@ -113,7 +126,7 @@ export class Lexer {
         this.advance();
 
         while (this.position < this.input.length && this.currentChar() !== '"') {
-            // Check for newline in string
+            // Checks for newline in string and handle multiline strings
             if (this.currentChar() === '\n') {
                 this.handleError('Multiline strings are not allowed', this.stringStartLine, this.stringStartColumn);
                 return;
@@ -130,6 +143,7 @@ export class Lexer {
             this.advance();
         }
 
+        // Checks for closing quote and unterminated string
         if (this.currentChar() === '"') {
             tokens.push({
                 type: TokenType.QUOTE,
@@ -144,18 +158,21 @@ export class Lexer {
         }
     }
 
+    // Skip comment method for the lexer
     private skipComment(): void {
         this.commentDepth++;
         const startLine = this.line;
         const startColumn = this.column;
         let foundEnd = false;
-        
+
         while (this.position < this.input.length) {
             if (this.currentChar() === '/' && this.peek() === '*') {
+                // Nested comment start
                 this.advance(); // skip /
                 this.advance(); // skip *
                 this.commentDepth++;
             } else if (this.currentChar() === '*' && this.peek() === '/') {
+                // Comment end
                 this.advance(); // skip *
                 this.advance(); // skip /
                 this.commentDepth--;
@@ -164,33 +181,42 @@ export class Lexer {
                     break;
                 }
             } else {
+                // Skip all other characters inside the comment
                 this.advance();
             }
         }
-        
+
         if (!foundEnd) {
             this.handleError('Unterminated comment block', startLine, startColumn);
-            this.commentDepth = 0; // Reset comment depth after error
+            // Skip to the end of the input or the next valid token
+            while (this.position < this.input.length && this.currentChar() !== '\n') {
+                this.advance();
+            }
         }
     }
 
+    // Check if character is a letter for the lexer
     private isLetter(char: string): boolean {
         return /[a-zA-Z]/.test(char);
     }
 
+    // Check if character is a digit for the lexer
     private isDigit(char: string): boolean {
         return /[0-9]/.test(char);
     }
 
+    // Check if character is a valid identifier character for the lexer
     private isIdentifierChar(char: string): boolean {
         return this.isLetter(char) || this.isDigit(char) || char === '_';
     }
 
+    // Check if word is a keyword for the lexer
     private isKeyword(word: string): boolean {
         const keywords = ['int', 'string', 'boolean', 'print', 'while', 'if', 'else', 'true', 'false'];
         return keywords.includes(word.toLowerCase());
     }
 
+    // Read number method for the lexer
     private readNumber(): string {
         let result = '';
         while (this.position < this.input.length && this.isDigit(this.currentChar())) {
@@ -200,6 +226,7 @@ export class Lexer {
         return result;
     }
 
+    // Process identifier method for the lexer
     private processIdentifier(word: string, line: number, column: number): Token {
         // Check for boolean values first
         if (word.toLowerCase() === 'true' || word.toLowerCase() === 'false') {
@@ -209,6 +236,7 @@ export class Lexer {
         return { type: TokenType.IDENTIFIER, value: word, line, column };
     }
 
+    // Read buffer method for the lexer
     private readBuffer(): string {
         let buffer = '';
         let tempPosition = this.position;
@@ -229,9 +257,9 @@ export class Lexer {
 
             // If we have a keyword match
             if (this.isKeyword(buffer)) {
-                // Advance position to end of keyword
+                // Advances position to end of keyword
                 this.position = chars[i].pos + 1;
-                // Update column
+                // Updates column
                 this.column += buffer.length;
                 return buffer;
             }
@@ -243,11 +271,10 @@ export class Lexer {
             this.column++;
             return chars[0].char;
         }
-
         return '';
     }
 
-
+    // Add log method for the lexer and also determines the color of the log
     private addLog(level: 'INFO' | 'DEBUG' | 'ERROR' | 'WARNING', message: string): void {
         let color = '';
         switch (level) {
@@ -265,7 +292,6 @@ export class Lexer {
                 color = '\x1b[32m'; // Green color
                 break;
         }
-
         this.logs.push({
             level,
             message,
@@ -273,11 +299,13 @@ export class Lexer {
         });
     }
 
+    // Log token method for the lexer and specific type of token
     private logToken(type: TokenType, value: string, line: number, column: number): void {
         let tokenName = type.toString();
         this.addLog('DEBUG', `Lexer - ${tokenName} [ ${value} ] found at (${line}:${column})`);
     }
 
+    // Reads print keyword method for the lexer
     private readPrintKeyword(): Token | null {
         const startColumn = this.column;
         let word = '';
@@ -299,6 +327,7 @@ export class Lexer {
         return null;
     }
 
+    // Process print content method for the lexer
     private processPrintContent(): void {
         // Skip any whitespace after 'print' keyword
         while (this.currentChar() === ' ') {
@@ -348,6 +377,7 @@ export class Lexer {
         this.advance();
     }
 
+    // Process keyword method for the lexer from our defined keywords
     private processKeyword(word: string, line: number, column: number): Token | null {
         switch (word.toLowerCase()) {
             case 'int':
@@ -372,6 +402,7 @@ export class Lexer {
         }
     }
 
+    // Process next token method for the lexer with buffer
     private processNextToken(currentLine: number, currentColumn: number): Token | null {
         const word = this.readBuffer();
         if (!word) return null;
@@ -386,13 +417,15 @@ export class Lexer {
         return this.processIdentifier(word, currentLine, currentColumn);
     }
 
-
+    // Main tokenize method for the lexer that accounts for different tokens and their logic in each case    
     public tokenize(): { tokens: Token[], logs: LexerLog[] } {
         const tokens: Token[] = [];
         while (this.position < this.input.length) {
             const char = this.currentChar();
             const currentLine = this.line;
             const currentColumn = this.column;
+
+            //this.addLog('DEBUG', `Processing char: ${char} at position ${this.position}`);        // debug log for lexer
 
             try {
                 switch (char) {
@@ -445,6 +478,7 @@ export class Lexer {
                         break;
 
                     case '=':
+                        // Checks for assignment or equality
                         if (this.peek() === '=') {
                             tokens.push({
                                 type: TokenType.EQUALS,
@@ -468,6 +502,7 @@ export class Lexer {
                         break;
 
                     case '!':
+                        // Checks for inequality
                         if (this.peek() === '=') {
                             tokens.push({
                                 type: TokenType.NOT_EQUALS,
@@ -513,7 +548,7 @@ export class Lexer {
                             this.addLog('INFO', ` Lexer - Lex completed with 0 errors`);
                         }
 
-                        // Reset for next program
+                        // Resets for next program
                         this.programCounter++;
                         if (this.position < this.input.length) {
                             this.addLog('INFO', `Lexer - Lexing program ${this.programCounter}..`);
@@ -522,19 +557,23 @@ export class Lexer {
                         break;
 
                     case '/':
+                        // Checks for block comments or invalid input
                         if (this.peek() === '*') {
+                            // Handle block comments
                             this.advance(); // skip /
                             this.advance(); // skip *
                             this.skipComment();
                         } else {
-                            this.handleError(char, currentLine, currentColumn);
+                            // Handle any unexpected input (e.g., // or / followed by anything else)
+                            this.handleError(`Unexpected character after '/': ${this.peek()}`, this.line, this.column);
+                            this.advance(); // Skip the '/' to avoid infinite loop
                         }
                         break;
 
                     case ' ':
                     case '\n':
                     case '\t':
-                        this.handleError('Tabs are not allowed', currentLine, currentColumn);
+                        //this.handleError('Tabs are not allowed', currentLine, currentColumn);
                         this.advance();
                         break;
                     case '\r':
@@ -542,6 +581,7 @@ export class Lexer {
                         break;
 
                     default:
+                        // Checks for letters and processes them
                         if (this.isLetter(char)) {
                             const token = this.processNextToken(currentLine, currentColumn);
                             if (token) {
@@ -593,7 +633,7 @@ export class Lexer {
                                                 this.advance();
                                             }
 
-                                            // Handle closing quote
+                                            // Handles closing quote
                                             if (this.currentChar() === '"') {
                                                 tokens.push({
                                                     type: TokenType.QUOTE,
@@ -621,6 +661,7 @@ export class Lexer {
                                 }
                             }
                         } else if (this.isDigit(char)) {
+                            // Reads number
                             const startColumn = currentColumn;
                             const number = this.readNumber();
                             const digitToken: Token = {
@@ -633,6 +674,7 @@ export class Lexer {
                             this.logToken(TokenType.DIGIT, number, currentLine, startColumn);
                         } else {
                             this.handleError(char, currentLine, currentColumn);
+                            this.advance();
                         }
                 }
             } catch (error) {
@@ -666,11 +708,12 @@ export class Lexer {
 
         return { tokens, logs: this.logs };
     }
+    // Handle error method for the lexer
     private handleError(message: string, line: number, column: number): void {
         this.errors++;
         this.addLog('ERROR', `Lexer - Error:${line}:${column} ${message}`);
+        this.advance(); // Skip the invalid character to avoid infinite loops
     }
-    
 }
 
 
