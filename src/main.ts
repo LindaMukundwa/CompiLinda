@@ -197,7 +197,7 @@ export class Lexer {
 
     // Check if character is a letter for the lexer
     private isLetter(char: string): boolean {
-        return /[a-zA-Z]/.test(char);
+        return /[a-z]/.test(char);
     }
 
     // Check if character is a digit for the lexer
