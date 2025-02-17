@@ -4,28 +4,47 @@ This is a project aimed at making a compiler, with beginning stages at a lexer. 
 
 The first version of this lexer was made with typescript and in order to make it work locally for you, make sure to clone this repository. From there, make sure you have node installed since that is what I am using to run it on a web environment. After that, in order to run the lexer, check the installation steps:
 
-## Installation
+# Project Structure 📂
 
-1. Clone the repository:
+This compiler is a work in progress and will eventually follow a more standard compiler with a parser, semantic analyzer, and code generator. Since this is done in TypeScript, the source The project is structured as follows:
+
+- src/
+  - main.ts: The entry point of the lexer.
+  - lexer.ts: The lexer implementation.
+
+The transpiled code is in the dist folder. The dist folder is the folder that is used to run the lexer and compiled from the src folder.
+
+## Installation 📦
+
+1. Install TypeScript:
+
+This first step is optional for anyone who may be new to using TypeScript. Install TypeScript globally on your machine. This is so that you can run the build command to transpile the code. Optionally, you can also download node and run the build command from there. There are some dependencies that may improve your experience, but they are not required.
+
+```bash
+npm install -g typescript
+```
+
+2. Clone the repository:
 
 ```bash
 git clone https://github.com/LindaMukundwa/CompiLinda
 cd CompiLinda
 ```
 
-2. Install the dependecies:
+3. (Optional)Install the dependecies:
 
 ```bash
 npm install
 npm run build
 ```
-3. Run the lexer:
+4. Run the lexer:
 
+By running the command below, you will transpile the code and run the lexer. Then, open index.html in your browser to view the lexer.
 ```bash
-npm run build
+tsc
 ```
 
-## Usage
+## Usage 👩🏾‍💻
 
 All of the source code is in the src folder. The main.ts file is the entry point of the lexer. The lexer is a web application that allows you to compile Alan++ code into tokens.
 
