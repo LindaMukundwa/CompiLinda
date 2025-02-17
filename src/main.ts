@@ -218,12 +218,12 @@ export class Lexer {
 
     // Read number method for the lexer
     private readNumber(): string {
-        let result = '';
-        while (this.position < this.input.length && this.isDigit(this.currentChar())) {
-            result += this.currentChar();
-            this.advance();
+        if (this.position < this.input.length && this.isDigit(this.currentChar())) {
+            const digit = this.currentChar();
+            this.advance(); // Move to the next character
+            return digit;
         }
-        return result;
+        return '';
     }
 
     // Process identifier method for the lexer
@@ -567,6 +567,28 @@ export class Lexer {
                             // Handle any unexpected input (e.g., // or / followed by anything else)
                             this.handleError(`Unexpected character after '/': ${this.peek()}`, this.line, this.column);
                             this.advance(); // Skip the '/' to avoid infinite loop
+                        }
+                        break;
+                    case '0':
+                    case '1':
+                    case '2':
+                    case '3':
+                    case '4':
+                    case '5':
+                    case '6':
+                    case '7':
+                    case '8':
+                    case '9':
+                        const digit = this.readNumber();
+                        if (digit) {
+                            const digitToken: Token = {
+                                type: TokenType.DIGIT,
+                                value: digit,
+                                line: currentLine,
+                                column: currentColumn
+                            };
+                            tokens.push(digitToken);
+                            this.logToken(TokenType.DIGIT, digit, currentLine, currentColumn);
                         }
                         break;
 
