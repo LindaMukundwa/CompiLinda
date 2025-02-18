@@ -111,10 +111,11 @@ export class Lexer {
         this.addLog('WARNING', `Lexer - Warning:${line}:${column} ${message}`);
     }
 
-    // Helper method which will validate each string character in a method for the lexer
+    // Validate string character method for the lexer
     private validateStringChar(char: string, line: number, column: number): boolean {
-        if (!this.isLetter(char)) {
-            this.handleError(`Invalid character '${char}' in string, only lowercase a-z allowed`, line, column);
+        // Allow lowercase letters, spaces, and other valid characters
+        if (!/[a-z ]/.test(char)) {
+            this.handleError(`Invalid character '${char}' in string, only lowercase a-z and spaces allowed`, line, column);
             return false;
         }
         return true;
@@ -147,12 +148,12 @@ export class Lexer {
                 this.handleError('Multiline strings are not allowed', this.stringStartLine, this.stringStartColumn);
                 return;
             }
-            
+    
             // Validate and process current character
             const currentChar = this.currentChar();
             const currentLine = this.line;
             const currentColumn = this.column;
-            
+    
             if (this.validateStringChar(currentChar, currentLine, currentColumn)) {
                 tokens.push({
                     type: TokenType.CHAR,
@@ -349,67 +350,6 @@ export class Lexer {
         return null;
     }
 
-    // Process print content method for the lexer
-    private processPrintContent(): void {
-        // Skip whitespace after 'print' keyword
-        while (this.currentChar() === ' ') {
-            this.advance();
-        }
-    
-        // Expect opening parenthesis
-        if (this.currentChar() !== '(') {
-            this.handleError(`Unexpected character: '${this.currentChar()}', expected '('`, this.line, this.column);
-            return;
-        }
-        this.advance();
-    
-        // Process characters until closing parenthesis
-        while (this.position < this.input.length && this.currentChar() !== ')') {
-            const char = this.currentChar();
-            const currentLine = this.line;
-            const currentColumn = this.column;
-    
-            if (char === '"') {
-                this.advance(); // Skip opening quote
-                
-                // Process all characters until closing quote
-                while (this.currentChar() !== '"' && this.position < this.input.length) {
-                    const currentChar = this.currentChar();
-                    const charLine = this.line;
-                    const charColumn = this.column;
-                    
-                    if (this.validateStringChar(currentChar, charLine, charColumn)) {
-                        const charToken: Token = {
-                            type: TokenType.CHAR,
-                            value: currentChar,
-                            line: charLine,
-                            column: charColumn
-                        };
-                        this.logToken(TokenType.CHAR, currentChar, charLine, charColumn);
-                    }
-                    // Always advance to the next character regardless of validation result
-                    this.advance();
-                }
-                
-                if (this.currentChar() === '"') {
-                    this.advance(); // Skip closing quote
-                }
-            } else if (char !== ' ') {
-                this.handleError(`Unexpected character: '${char}'`, currentLine, currentColumn);
-                this.advance();
-            } else {
-                this.advance(); // Skip whitespace
-            }
-        }
-    
-        // Check for closing parenthesis
-        if (this.currentChar() !== ')') {
-            this.handleError(`Unexpected character: '${this.currentChar()}', expected ')'`, this.line, this.column);
-            return;
-        }
-        this.advance();
-    }
-
     // Process keyword method for the lexer from our defined keywords
     private processKeyword(word: string, line: number, column: number): Token | null {
         switch (word.toLowerCase()) {
@@ -598,7 +538,7 @@ export class Lexer {
                             this.skipComment();
                         } else {
                             // Handle any unexpected input (e.g., // or / followed by anything else)
-                            this.handleError(`Unexpected character after '/': ${this.peek()}`, this.line, this.column);
+                            //this.handleError(`Unexpected character after '/': ${this.peek()}`, this.line, this.column);
                             this.advance(); // Skip the '/' to avoid infinite loop
                         }
                         break;
@@ -668,7 +608,7 @@ export class Lexer {
                                         if (this.currentChar() === '"') {
                                             this.handleString(tokens); // Use our fixed string handler
                                         } else {
-                                            this.handleError(`Expected string after print(, found '${this.currentChar()}'`, this.line, this.column);
+                                            //this.handleError(`Expected string after print(, found '${this.currentChar()}'`, this.line, this.column);
                                             this.advance();
                                         }
                                 
@@ -683,10 +623,10 @@ export class Lexer {
                                             this.logToken(TokenType.RIGHT_PAREN, ')', this.line, this.column);
                                             this.advance();
                                         } else {
-                                            this.handleError(`Expected closing parenthesis, found '${this.currentChar()}'`, this.line, this.column);
+                                            //this.handleError(`Expected closing parenthesis, found '${this.currentChar()}'`, this.line, this.column);
                                         }
                                     } else {
-                                        this.handleError(`Expected opening parenthesis after print, found '${this.currentChar()}'`, this.line, this.column);
+                                        //this.handleError(`Expected opening parenthesis after print, found '${this.currentChar()}'`, this.line, this.column);
                                     }
                                 }
                             }
@@ -742,7 +682,7 @@ export class Lexer {
     private handleError(message: string, line: number, column: number): void {
         this.errors++;
         this.addLog('ERROR', `Lexer - Error:${line}:${column} ${message}`);
-        //this.advance(); // Skip the invalid character to avoid infinite loops
+        this.advance(); // Skip the invalid character to avoid infinite loops
     }
 }
 
