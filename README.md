@@ -1,10 +1,10 @@
-## CompiLinda 🌺
+# CompiLinda 🌺
 
 This is a project aimed at making a compiler, with beginning stages at a lexer. This project is a work in progress and will be updated as I continue to work on it. The grammar of the language is defined as Alan++ and as such, is the basis of the lexer.
 
 The first version of this lexer was made with typescript and in order to make it work locally for you, make sure to clone this repository. From there, make sure you have node installed since that is what I am using to run it on a web environment. After that, in order to run the lexer, check the installation steps:
 
-# Project Structure 📂
+## Project Structure 📂
 
 This compiler is a work in progress and will eventually follow a more standard compiler with a parser, semantic analyzer, and code generator. Since this is done in TypeScript, the source The project is structured as follows:
 
@@ -14,7 +14,7 @@ This compiler is a work in progress and will eventually follow a more standard c
 
 The transpiled code is in the dist folder. The dist folder is the folder that is used to run the lexer and compiled from the src folder.**NOTE:** Please grade the main branch as this is the latest version of the lexer.
 
-# Installation 📦
+## Installation 📦
 
 1. Install TypeScript:
 
