@@ -125,7 +125,7 @@ export class Lexer {
     private handleString(tokens: Token[]): void {
         this.stringStartLine = this.line;
         this.stringStartColumn = this.column;
-    
+
         // Add opening quote token
         tokens.push({
             type: TokenType.QUOTE,
@@ -135,25 +135,25 @@ export class Lexer {
         });
         this.logToken(TokenType.QUOTE, '"', this.line, this.column);
         this.advance();
-    
+
         // Process each character inside the string
         while (this.position < this.input.length) {
             // Check for end of string
             if (this.currentChar() === '"') {
                 break;
             }
-    
+
             // Check for newline in string
             if (this.currentChar() === '\n') {
                 this.handleError('Multiline strings are not allowed', this.stringStartLine, this.stringStartColumn);
                 return;
             }
-    
+
             // Validate and process current character
             const currentChar = this.currentChar();
             const currentLine = this.line;
             const currentColumn = this.column;
-    
+
             if (this.validateStringChar(currentChar, currentLine, currentColumn)) {
                 tokens.push({
                     type: TokenType.CHAR,
@@ -165,7 +165,7 @@ export class Lexer {
             }
             this.advance();
         }
-    
+
         // Handle the closing quote or unterminated string
         if (this.currentChar() === '"') {
             tokens.push({
@@ -241,9 +241,10 @@ export class Lexer {
 
     // Read number method for the lexer
     private readNumber(): string {
+        // Only read a single digit as per the grammar
         if (this.position < this.input.length && this.isDigit(this.currentChar())) {
             const digit = this.currentChar();
-            this.advance(); // Move to the next character
+            this.advance();
             return digit;
         }
         return '';
@@ -553,16 +554,13 @@ export class Lexer {
                     case '8':
                     case '9':
                         const digit = this.readNumber();
-                        if (digit) {
-                            const digitToken: Token = {
-                                type: TokenType.DIGIT,
-                                value: digit,
-                                line: currentLine,
-                                column: currentColumn
-                            };
-                            tokens.push(digitToken);
-                            this.logToken(TokenType.DIGIT, digit, currentLine, currentColumn);
-                        }
+                        tokens.push({
+                            type: TokenType.DIGIT,
+                            value: digit,
+                            line: currentLine,
+                            column: currentColumn
+                        });
+                        this.logToken(TokenType.DIGIT, digit, currentLine, currentColumn);
                         break;
 
                     case ' ':
@@ -587,7 +585,7 @@ export class Lexer {
                                     while (this.currentChar() === ' ') {
                                         this.advance();
                                     }
-                                
+
                                     // Handle left parenthesis
                                     if (this.currentChar() === '(') {
                                         tokens.push({
@@ -598,20 +596,12 @@ export class Lexer {
                                         });
                                         this.logToken(TokenType.LEFT_PAREN, '(', this.line, this.column);
                                         this.advance();
-                                
-                                        // Skip whitespace
-                                        while (this.currentChar() === ' ') {
-                                            this.advance();
-                                        }
-                                
+
                                         // Handle quote and string content
                                         if (this.currentChar() === '"') {
-                                            this.handleString(tokens); // Use our fixed string handler
-                                        } else {
-                                            //this.handleError(`Expected string after print(, found '${this.currentChar()}'`, this.line, this.column);
-                                            this.advance();
+                                            this.handleString(tokens);
                                         }
-                                
+
                                         // Handle right parenthesis
                                         if (this.currentChar() === ')') {
                                             tokens.push({
@@ -622,8 +612,6 @@ export class Lexer {
                                             });
                                             this.logToken(TokenType.RIGHT_PAREN, ')', this.line, this.column);
                                             this.advance();
-                                        } else {
-                                            //this.handleError(`Expected closing parenthesis, found '${this.currentChar()}'`, this.line, this.column);
                                         }
                                     } else {
                                         //this.handleError(`Expected opening parenthesis after print, found '${this.currentChar()}'`, this.line, this.column);
