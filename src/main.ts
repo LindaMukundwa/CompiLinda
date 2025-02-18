@@ -111,11 +111,21 @@ export class Lexer {
         this.addLog('WARNING', `Lexer - Warning:${line}:${column} ${message}`);
     }
 
+    // Helper method which will validate each string character in a method for the lexer
+    private validateStringChar(char: string, line: number, column: number): boolean {
+        if (!this.isLetter(char)) {
+            this.handleError(`Invalid character '${char}' in string, only lowercase a-z allowed`, line, column);
+            return false;
+        }
+        return true;
+    }
+
     // Handle string method for the lexer
     private handleString(tokens: Token[]): void {
         this.stringStartLine = this.line;
         this.stringStartColumn = this.column;
-
+    
+        // Add opening quote token
         tokens.push({
             type: TokenType.QUOTE,
             value: '"',
@@ -124,26 +134,38 @@ export class Lexer {
         });
         this.logToken(TokenType.QUOTE, '"', this.line, this.column);
         this.advance();
-
-        while (this.position < this.input.length && this.currentChar() !== '"') {
-            // Checks for newline in string and handle multiline strings
+    
+        // Process each character inside the string
+        while (this.position < this.input.length) {
+            // Check for end of string
+            if (this.currentChar() === '"') {
+                break;
+            }
+    
+            // Check for newline in string
             if (this.currentChar() === '\n') {
                 this.handleError('Multiline strings are not allowed', this.stringStartLine, this.stringStartColumn);
                 return;
             }
-
-            const charToken: Token = {
-                type: TokenType.CHAR,
-                value: this.currentChar(),
-                line: this.line,
-                column: this.column
-            };
-            tokens.push(charToken);
-            this.logToken(TokenType.CHAR, this.currentChar(), this.line, this.column);
+            
+            // Validate and process current character
+            const currentChar = this.currentChar();
+            const currentLine = this.line;
+            const currentColumn = this.column;
+            
+            if (this.validateStringChar(currentChar, currentLine, currentColumn)) {
+                tokens.push({
+                    type: TokenType.CHAR,
+                    value: currentChar,
+                    line: currentLine,
+                    column: currentColumn
+                });
+                this.logToken(TokenType.CHAR, currentChar, currentLine, currentColumn);
+            }
             this.advance();
         }
-
-        // Checks for closing quote and unterminated string
+    
+        // Handle the closing quote or unterminated string
         if (this.currentChar() === '"') {
             tokens.push({
                 type: TokenType.QUOTE,
@@ -329,49 +351,60 @@ export class Lexer {
 
     // Process print content method for the lexer
     private processPrintContent(): void {
-        // Skip any whitespace after 'print' keyword
+        // Skip whitespace after 'print' keyword
         while (this.currentChar() === ' ') {
             this.advance();
         }
-
+    
         // Expect opening parenthesis
         if (this.currentChar() !== '(') {
-            this.handleError(this.currentChar(), this.line, this.column);
+            this.handleError(`Unexpected character: '${this.currentChar()}', expected '('`, this.line, this.column);
             return;
         }
         this.advance();
-
+    
         // Process characters until closing parenthesis
         while (this.position < this.input.length && this.currentChar() !== ')') {
             const char = this.currentChar();
             const currentLine = this.line;
             const currentColumn = this.column;
-
+    
             if (char === '"') {
                 this.advance(); // Skip opening quote
+                
                 // Process all characters until closing quote
                 while (this.currentChar() !== '"' && this.position < this.input.length) {
-                    const charToken: Token = {
-                        type: TokenType.CHAR,
-                        value: this.currentChar(),
-                        line: this.line,
-                        column: this.column
-                    };
-                    this.logToken(TokenType.CHAR, this.currentChar(), this.line, this.column);
+                    const currentChar = this.currentChar();
+                    const charLine = this.line;
+                    const charColumn = this.column;
+                    
+                    if (this.validateStringChar(currentChar, charLine, charColumn)) {
+                        const charToken: Token = {
+                            type: TokenType.CHAR,
+                            value: currentChar,
+                            line: charLine,
+                            column: charColumn
+                        };
+                        this.logToken(TokenType.CHAR, currentChar, charLine, charColumn);
+                    }
+                    // Always advance to the next character regardless of validation result
                     this.advance();
                 }
+                
                 if (this.currentChar() === '"') {
                     this.advance(); // Skip closing quote
                 }
             } else if (char !== ' ') {
-                this.handleError(char, currentLine, currentColumn);
+                this.handleError(`Unexpected character: '${char}'`, currentLine, currentColumn);
+                this.advance();
+            } else {
+                this.advance(); // Skip whitespace
             }
-            this.advance();
         }
-
+    
         // Check for closing parenthesis
         if (this.currentChar() !== ')') {
-            this.handleError(this.currentChar(), this.line, this.column);
+            this.handleError(`Unexpected character: '${this.currentChar()}', expected ')'`, this.line, this.column);
             return;
         }
         this.advance();
@@ -610,11 +643,11 @@ export class Lexer {
                                 tokens.push(token);
                                 this.logToken(token.type, token.value, currentLine, currentColumn);
                                 if (token.type === TokenType.PRINT) {
-                                    // Skip whitespace after print
+                                    // Skip whitespace after print keyword
                                     while (this.currentChar() === ' ') {
                                         this.advance();
                                     }
-
+                                
                                     // Handle left parenthesis
                                     if (this.currentChar() === '(') {
                                         tokens.push({
@@ -625,49 +658,20 @@ export class Lexer {
                                         });
                                         this.logToken(TokenType.LEFT_PAREN, '(', this.line, this.column);
                                         this.advance();
-
+                                
                                         // Skip whitespace
                                         while (this.currentChar() === ' ') {
                                             this.advance();
                                         }
-
-                                        // Handle quote
+                                
+                                        // Handle quote and string content
                                         if (this.currentChar() === '"') {
-                                            tokens.push({
-                                                type: TokenType.QUOTE,
-                                                value: '"',
-                                                line: this.line,
-                                                column: this.column
-                                            });
-                                            this.logToken(TokenType.QUOTE, '"', this.line, this.column);
+                                            this.handleString(tokens); // Use our fixed string handler
+                                        } else {
+                                            this.handleError(`Expected string after print(, found '${this.currentChar()}'`, this.line, this.column);
                                             this.advance();
-
-                                            // Process characters inside quotes
-                                            while (this.currentChar() !== '"' && this.position < this.input.length) {
-                                                const charToken: Token = {
-                                                    type: TokenType.CHAR,
-                                                    value: this.currentChar(),
-                                                    line: this.line,
-                                                    column: this.column
-                                                };
-                                                tokens.push(charToken);
-                                                this.logToken(TokenType.CHAR, this.currentChar(), this.line, this.column);
-                                                this.advance();
-                                            }
-
-                                            // Handles closing quote
-                                            if (this.currentChar() === '"') {
-                                                tokens.push({
-                                                    type: TokenType.QUOTE,
-                                                    value: '"',
-                                                    line: this.line,
-                                                    column: this.column
-                                                });
-                                                this.logToken(TokenType.QUOTE, '"', this.line, this.column);
-                                                this.advance();
-                                            }
                                         }
-
+                                
                                         // Handle right parenthesis
                                         if (this.currentChar() === ')') {
                                             tokens.push({
@@ -678,7 +682,11 @@ export class Lexer {
                                             });
                                             this.logToken(TokenType.RIGHT_PAREN, ')', this.line, this.column);
                                             this.advance();
+                                        } else {
+                                            this.handleError(`Expected closing parenthesis, found '${this.currentChar()}'`, this.line, this.column);
                                         }
+                                    } else {
+                                        this.handleError(`Expected opening parenthesis after print, found '${this.currentChar()}'`, this.line, this.column);
                                     }
                                 }
                             }
@@ -734,7 +742,7 @@ export class Lexer {
     private handleError(message: string, line: number, column: number): void {
         this.errors++;
         this.addLog('ERROR', `Lexer - Error:${line}:${column} ${message}`);
-        this.advance(); // Skip the invalid character to avoid infinite loops
+        //this.advance(); // Skip the invalid character to avoid infinite loops
     }
 }
 

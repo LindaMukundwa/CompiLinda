@@ -1,4 +1,4 @@
-# CompiLinda 🌺
+## CompiLinda 🌺
 
 This is a project aimed at making a compiler, with beginning stages at a lexer. This project is a work in progress and will be updated as I continue to work on it. The grammar of the language is defined as Alan++ and as such, is the basis of the lexer.
 
@@ -12,9 +12,9 @@ This compiler is a work in progress and will eventually follow a more standard c
   - main.ts: The entry point of the lexer.
   - lexer.ts: The lexer implementation.
 
-The transpiled code is in the dist folder. The dist folder is the folder that is used to run the lexer and compiled from the src folder.
+The transpiled code is in the dist folder. The dist folder is the folder that is used to run the lexer and compiled from the src folder.**NOTE:** Please grade the main branch as this is the latest version of the lexer.
 
-## Installation 📦
+# Installation 📦
 
 1. Install TypeScript:
 
@@ -39,7 +39,7 @@ npm run build
 ```
 4. Run the lexer:
 
-By running the command below, you will transpile the code and run the lexer. Then, open index.html in your browser to view the lexer.
+By running the command below, you will transpile the code and run the lexer. Then, open **index.html** in your browser to view the lexer.
 ```bash
 tsc
 ```
