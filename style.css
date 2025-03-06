@@ -163,3 +163,56 @@ tr:nth-child(even) {
     border-radius: 4px;
     display: none;
 }
+
+/* Additional styles for CST display */
+.cst-container {
+    margin-top: 20px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-family: monospace;
+    white-space: pre;
+    overflow-x: auto;
+}
+
+.parse-success {
+    color: green;
+    font-weight: bold;
+}
+
+.parse-error {
+    color: red;
+    font-weight: bold;
+}
+
+.tab-container {
+    display: flex;
+    margin-top: 10px;
+}
+
+.tab {
+    padding: 10px 20px;
+    background-color: #e9ecef;
+    border: 1px solid #ccc;
+    border-bottom: none;
+    border-radius: 5px 5px 0 0;
+    cursor: pointer;
+    margin-right: 5px;
+}
+
+.tab.active {
+    background-color: #fff;
+    font-weight: bold;
+}
+
+.tab-content {
+    display: none;
+    padding: 15px;
+    border: 1px solid #ccc;
+    border-radius: 0 5px 5px 5px;
+}
+
+.tab-content.active {
+    display: block;
+}

@@ -1,49 +1,209 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CompiLinda</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Add this script tag to create a mock require function -->
+    <script>
+        // Mock require function for browser compatibility
+        var require = function(module) {
+            if (module === './main') {
+                return window.mainExports || {};
+            }
+            return {};
+        };
+        
+        // Create a global exports object that the scripts can modify
+        var exports = {};
+        var mainExports = {};
+    </script>
+    <!-- Load main.js first and store its exports -->
+    <script src="./dist/main.js"></script>
+    <script>
+        // Store main.js exports for later use
+        window.mainExports = exports;
+        // Reset exports for parser.js
+        exports = {};
+    </script>
+    <!-- Then load parser.js -->
+    <script src="./dist/parser.js"></script>
 </head>
+
 <body>
     <div class="container">
         <h1 id="title">CompiLinda</h1>
-            <textarea id="sourceCode" placeholder="Enter your source code here (e.g., {}$)"></textarea>
-            <button onclick="lexer()">Compile!</button>
-            <div id="errorMessage" class="error"></div>
+        <textarea id="sourceCode" placeholder="Enter your source code here (e.g., {}$)"></textarea>
+        <div class="button-group">
+            <button onclick="lexerOnly()">Lex</button>
+            <button onclick="compile()">Compile</button>
+        </div>
+        <div id="errorMessage" class="error"></div>
+
+        <div class="tab-container">
+            <div class="tab active" onclick="showTab('lexer')">Lexer Output</div>
+            <div class="tab" onclick="showTab('parser')">Parser Output</div>
+        </div>
+
+        <div id="lexerTab" class="tab-content active">
             <div id="lexerOutput"></div>
+        </div>
+
+        <div id="parserTab" class="tab-content">
+            <div id="parseStatus"></div>
+            <div id="cstDisplay" class="cst-container"></div>
+        </div>
     </div>
 
-    <script> var exports = {}; </script>
-    <script src="./dist/main.js"></script>
     <script>
-        // Lexer function in JavaScript that uses the Lexer class from the main.ts file
-         function lexer() {
-        const sourceCode = document.getElementById('sourceCode').value;
-        const outputDiv = document.getElementById('lexerOutput');
-        const errorDiv = document.getElementById('errorMessage');
-        
-        try {
-            const lexer = new Lexer(sourceCode);
-            const result = lexer.tokenize();
-            
-            errorDiv.style.display = 'none';
-            outputDiv.innerHTML = '';
-            
-            // Display logs with appropriate styling
-            result.logs.forEach(log => {
-                const logElement = document.createElement('div');
-                logElement.className = `log-${log.level.toLowerCase()}`;
-                logElement.textContent = log.message;
-                outputDiv.appendChild(logElement);
-            });
-        } catch (error) {
-            errorDiv.textContent = error.message;
-            errorDiv.style.display = 'block';
-            outputDiv.innerHTML = '';
+        // Function to ensure both Lexer and Parser are accessible
+        function checkDependencies() {
+            if (typeof Lexer === 'undefined') {
+                document.getElementById('errorMessage').textContent = 
+                    'Error: Lexer not found. Ensure compilation was successful.';
+                document.getElementById('errorMessage').style.display = 'block';
+                return false;
+            }
+            if (typeof Parser === 'undefined') {
+                document.getElementById('errorMessage').textContent = 
+                    'Error: Parser not found. Ensure compilation was successful.';
+                document.getElementById('errorMessage').style.display = 'block';
+                return false;
+            }
+            return true;
         }
-    }
+        
+        // Show the selected tab
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Deactivate all tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show the selected tab
+            if (tabName === 'lexer') {
+                document.getElementById('lexerTab').classList.add('active');
+                document.querySelector('.tab:nth-child(1)').classList.add('active');
+            } else if (tabName === 'parser') {
+                document.getElementById('parserTab').classList.add('active');
+                document.querySelector('.tab:nth-child(2)').classList.add('active');
+            }
+        }
+
+        // Lexer function that just performs lexing
+        function lexerOnly() {
+            if (!checkDependencies()) return;
+            
+            const sourceCode = document.getElementById('sourceCode').value;
+            const outputDiv = document.getElementById('lexerOutput');
+            const errorDiv = document.getElementById('errorMessage');
+
+            try {
+                const lexer = new Lexer(sourceCode);
+                const result = lexer.tokenize();
+
+                errorDiv.style.display = 'none';
+                outputDiv.innerHTML = '';
+
+                // Display logs with appropriate styling
+                result.logs.forEach(log => {
+                    const logElement = document.createElement('div');
+                    logElement.className = `log-${log.level.toLowerCase()}`;
+                    logElement.textContent = log.message;
+                    outputDiv.appendChild(logElement);
+                });
+
+                // Show lexer tab
+                showTab('lexer');
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+                outputDiv.innerHTML = '';
+            }
+        }
+
+        // Complete compilation function that performs lexing and parsing
+        function compile() {
+            if (!checkDependencies()) return;
+            
+            const sourceCode = document.getElementById('sourceCode').value;
+            const lexerOutputDiv = document.getElementById('lexerOutput');
+            const parseStatusDiv = document.getElementById('parseStatus');
+            const cstDisplayDiv = document.getElementById('cstDisplay');
+            const errorDiv = document.getElementById('errorMessage');
+
+            try {
+                // First, run the lexer
+                const lexer = new Lexer(sourceCode);
+                const lexResult = lexer.tokenize();
+
+                errorDiv.style.display = 'none';
+                lexerOutputDiv.innerHTML = '';
+                parseStatusDiv.innerHTML = '';
+                cstDisplayDiv.innerHTML = '';
+
+                // Display lexer logs
+                lexResult.logs.forEach(log => {
+                    const logElement = document.createElement('div');
+                    logElement.className = `log-${log.level.toLowerCase()}`;
+                    logElement.textContent = log.message;
+                    lexerOutputDiv.appendChild(logElement);
+                });
+
+                // Check if lexing had errors before parsing
+                const hasLexErrors = lexResult.logs.some(log => log.level === 'ERROR');
+
+                if (hasLexErrors) {
+                    parseStatusDiv.innerHTML = '<div class="parse-error">Cannot parse: Lexical errors detected</div>';
+                    showTab('parser');
+                    return;
+                }
+
+                // Then, run the parser
+                const parser = new Parser(lexResult.tokens);
+                const parseResult = parser.parse();
+
+                // Display parser logs
+                parseResult.logs.forEach(log => {
+                    const logElement = document.createElement('div');
+                    logElement.className = `log-${log.level.toLowerCase()}`;
+                    logElement.textContent = log.message;
+                    parseStatusDiv.appendChild(logElement);
+                });
+
+                // Display CST if parsing was successful
+                if (parseResult.ast) {
+                    const cstOutput = parser.printCST(parseResult.ast);
+                    cstDisplayDiv.textContent = cstOutput;
+
+                    // Check if parsing had errors
+                    const hasParseErrors = parseResult.logs.some(log => log.level === 'ERROR');
+
+                    if (!hasParseErrors) {
+                        parseStatusDiv.innerHTML += '<div class="parse-success">Parsing successful! Concrete Syntax Tree created.</div>';
+                    }
+                } else {
+                    cstDisplayDiv.textContent = 'No parse tree available.';
+                }
+
+                // Show parser tab
+                showTab('parser');
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+                lexerOutputDiv.innerHTML = '';
+                parseStatusDiv.innerHTML = '';
+                cstDisplayDiv.innerHTML = '';
+            }
+        }
     </script>
 </body>
+
 </html>
