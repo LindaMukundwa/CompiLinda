@@ -46,7 +46,7 @@ export class Parser {
         const current = this.currentToken();
 
         if (current.type === expectedType) {
-            this.addLog('DEBUG', `PARSER: Consumed ${expectedType} [ ${current.value} ]`);
+           // this.addLog('DEBUG', `PARSER: Consumed ${expectedType} [ ${current.value} ]`);
             this.advance();
             return current;
         } else {
@@ -88,21 +88,82 @@ export class Parser {
         parent.children.push(child);
     }
 
-    // Main parse method
+    // Main parse program that allows for multiple programs 
+    // Modified parse method that works with your token types
     public parse(): ParserResult {
+        
+        // debug log 
+        console.log("Initial tokens:", this.tokens.map(t => `${t.type}:${t.value}`).join(', '));
+
         this.addLog('DEBUG', 'PARSER: parse()');
-        const ast = this.parseProgram();
+
+        // Create a root node to hold all programs
+        const rootNode = this.createNode('Programs');
+        let hasParsedAnyProgram = false;
+
+        // Parse each program until we reach the end of the token stream
+        while (this.position < this.tokens.length && !this.match(TokenType.EOF)) {
+            // debug log 
+            console.log(`Current position: ${this.position}, token: ${this.currentToken().type}:${this.currentToken().value}`);
+
+            this.addLog('INFO', `PARSER: Parsing program ${this.programCounter}...`);
+
+            // Check if we've reached the end of input
+            if (this.position >= this.tokens.length || this.match(TokenType.EOF)) {
+                break;
+            }
+
+            const programNode = this.parseProgram();
+
+            // debug log 
+            console.log(`After parsing program, position: ${this.position}, token: ${this.currentToken().type}:${this.currentToken().value}`);
+
+            if (programNode) {
+                this.addChild(rootNode, programNode);
+                this.programCounter++;
+                hasParsedAnyProgram = true;
+            } else {
+                // Error recovery: skip to next program
+                this.skipToNextProgram();
+            }
+        }
 
         if (this.errors > 0) {
             this.addLog('ERROR', `PARSER: Parse failed with ${this.errors} error(s)`);
+        } else if (hasParsedAnyProgram) {
+            this.addLog('INFO', `PARSER: Parse completed successfully with ${this.programCounter - 1} program(s)`);
         } else {
-            this.addLog('INFO', 'PARSER: Parse completed successfully');
+            this.addLog('WARNING', 'PARSER: No valid programs found to parse');
         }
 
+        // Return the root node if we parsed at least one program, otherwise null
         return {
-            ast,
+            ast: hasParsedAnyProgram ? rootNode : null,
             logs: this.logs
         };
+    }
+    // Skip tokens until we find the start of a new program
+    private skipToNextProgram(): void {
+        this.addLog('WARNING', `PARSER: Skipping to next program after error at line ${this.currentToken().line}, column ${this.currentToken().column}`);
+
+        // Keep track of whether we've seen an EOP token
+        let foundEOP = false;
+
+        while (this.position < this.tokens.length) {
+            // If we find an EOP token, advance past it
+            if (this.match(TokenType.EOP)) {
+                this.advance();
+                foundEOP = true;
+                break;
+            }
+            this.advance();
+        }
+
+        if (foundEOP) {
+            this.addLog('INFO', 'PARSER: Found next program start');
+        } else {
+            this.addLog('WARNING', 'PARSER: Reached end of input while skipping');
+        }
     }
 
     // Parse program (starting rule)
@@ -110,6 +171,12 @@ export class Parser {
         this.addLog('DEBUG', 'PARSER: parseProgram()');
 
         const programNode = this.createNode('Program');
+
+        // Check if we're at the start of a program (should be an open block)
+        if (!this.match(TokenType.OPEN_BLOCK)) {
+            this.handleError("Expected '{' to start program", this.currentToken());
+            return null;
+        }
 
         // Parse block
         const blockNode = this.parseBlock();
@@ -584,11 +651,24 @@ export class Parser {
 
         let output = '';
 
+        // Special handling for root node
+        if (node.name === 'Programs') {
+            output += 'Programs Root:\n';
+            for (let i = 0; i < node.children.length; i++) {
+                output += `Program ${i + 1}:\n`;
+                output += this.printCST(node.children[i], indent + '  ');
+                if (i < node.children.length - 1) {
+                    output += '\n'; // Add separation between programs
+                }
+            }
+            return output;
+        }
+
         // Add node information
         if (node.token) {
             output += `${indent}[${node.token.value}]\n`;
         } else {
-            if (node.name !== 'Program' && node.name !== 'StatementList') {
+            if (node.name !== 'StatementList') {
                 output += `${indent}[${node.name}]\n`;
             }
         }
