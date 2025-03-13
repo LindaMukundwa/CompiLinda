@@ -37,7 +37,6 @@
         <h1 id="title">CompiLinda</h1>
         <textarea id="sourceCode" placeholder="Enter your source code here (e.g., {}$)"></textarea>
         <div class="button-group">
-            <button onclick="lexerOnly()">Lex</button>
             <button onclick="compile()">Compile</button>
         </div>
         <div id="errorMessage" class="error"></div>
@@ -97,38 +96,6 @@
             }
         }
 
-        // Lexer function that just performs lexing
-        function lexerOnly() {
-            if (!checkDependencies()) return;
-            
-            const sourceCode = document.getElementById('sourceCode').value;
-            const outputDiv = document.getElementById('lexerOutput');
-            const errorDiv = document.getElementById('errorMessage');
-
-            try {
-                const lexer = new Lexer(sourceCode);
-                const result = lexer.tokenize();
-
-                errorDiv.style.display = 'none';
-                outputDiv.innerHTML = '';
-
-                // Display logs with appropriate styling
-                result.logs.forEach(log => {
-                    const logElement = document.createElement('div');
-                    logElement.className = `log-${log.level.toLowerCase()}`;
-                    logElement.textContent = log.message;
-                    outputDiv.appendChild(logElement);
-                });
-
-                // Show lexer tab
-                showTab('lexer');
-            } catch (error) {
-                errorDiv.textContent = error.message;
-                errorDiv.style.display = 'block';
-                outputDiv.innerHTML = '';
-            }
-        }
-
         // Complete compilation function that performs lexing and parsing
         function compile() {
             if (!checkDependencies()) return;
@@ -156,6 +123,9 @@
                     logElement.textContent = log.message;
                     lexerOutputDiv.appendChild(logElement);
                 });
+
+                // Show lexer tab
+                showTab('lexer');
 
                 // Check if lexing had errors before parsing
                 const hasLexErrors = lexResult.logs.some(log => log.level === 'ERROR');
