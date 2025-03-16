@@ -9,13 +9,13 @@
     <!-- Add this script tag to create a mock require function -->
     <script>
         // Mock require function for browser compatibility
-        var require = function(module) {
+        var require = function (module) {
             if (module === './main') {
                 return window.mainExports || {};
             }
             return {};
         };
-        
+
         // Create a global exports object that the scripts can modify
         var exports = {};
         var mainExports = {};
@@ -60,20 +60,20 @@
         // Function to ensure both Lexer and Parser are accessible
         function checkDependencies() {
             if (typeof Lexer === 'undefined') {
-                document.getElementById('errorMessage').textContent = 
+                document.getElementById('errorMessage').textContent =
                     'Error: Lexer not found. Ensure compilation was successful.';
                 document.getElementById('errorMessage').style.display = 'block';
                 return false;
             }
             if (typeof Parser === 'undefined') {
-                document.getElementById('errorMessage').textContent = 
+                document.getElementById('errorMessage').textContent =
                     'Error: Parser not found. Ensure compilation was successful.';
                 document.getElementById('errorMessage').style.display = 'block';
                 return false;
             }
             return true;
         }
-        
+
         // Show the selected tab
         function showTab(tabName) {
             // Hide all tabs
@@ -97,9 +97,10 @@
         }
 
         // Complete compilation function that performs lexing and parsing
+        // updated compile function to not check for lexical errors since parsing handles that problem
         function compile() {
             if (!checkDependencies()) return;
-            
+
             const sourceCode = document.getElementById('sourceCode').value;
             const lexerOutputDiv = document.getElementById('lexerOutput');
             const parseStatusDiv = document.getElementById('parseStatus');
@@ -126,15 +127,6 @@
 
                 // Show lexer tab
                 showTab('lexer');
-
-                // Check if lexing had errors before parsing
-                const hasLexErrors = lexResult.logs.some(log => log.level === 'ERROR');
-
-                if (hasLexErrors) {
-                    parseStatusDiv.innerHTML = '<div class="parse-error">Cannot parse: Lexical errors detected</div>';
-                    showTab('parser');
-                    return;
-                }
 
                 // Then, run the parser
                 const parser = new Parser(lexResult.tokens);
