@@ -23,7 +23,7 @@ export class Parser {
     private position: number = 0;
     private logs: LexerLog[] = [];
     private errors: number = 0;
-    private warnings: number = 0;
+    //private warnings: number = 0;
     private programCounter: number = 1;
 
     constructor(tokens: Token[]) {
@@ -113,50 +113,62 @@ export class Parser {
         return this.tokens.length;
     }
 
-    // checks if there is lex errors and if so skips parsing 
-    private hasLexicalErrors(startPos: number, endPos: number): boolean {
-        // Check if any token in the range [startPos, endPos) has an error
-        for (let i = startPos; i < endPos; i++) {
-            if (i < this.tokens.length && (this.tokens[i] as any).hasError) {
-                return true;
+    // updated function to check for errors within each singular program and stopping parsing
+    // instead of skipping entire parse by checking logs array for ERROR
+    private hasLexicalErrors(startPos: number, endPos: number, logs: LexerLog[]): boolean {
+        // Check if any ERROR logs fall within the range of the current program
+        for (const log of logs) {
+            if (log.level === 'ERROR') {
+                // Extract line and column from the log message
+                const match = log.message.match(/Error:(\d+):(\d+)/);
+                if (match) {
+                    const errorLine = parseInt(match[1], 10);
+                    const errorColumn = parseInt(match[2], 10);
+    
+                    // Check if the error is within the current program's token range
+                    for (let i = startPos; i < endPos; i++) {
+                        if (i < this.tokens.length && this.tokens[i].line === errorLine && this.tokens[i].column === errorColumn) {
+                            return true; // Lexical error found in this program
+                        }
+                    }
+                }
             }
         }
-        return false;
+        return false; // No lexical errors found in this program
     }
 
     // Main parse program that allows for multiple programs 
     // Modified parse method that works with your token types
+    // updated parse function to skip programs with lex errors from logs array
     public parse(): ParserResult {
-
-        // debug log 
+        // Debug log
         console.log("Initial tokens:", this.tokens.map(t => `${t.type}:${t.value}`).join(', '));
-
+    
         // Create a root node to hold all programs
         const rootNode = this.createNode('Programs');
         let hasParsedAnyProgram = false;
-
+    
         // Parse each program until we reach the end of the token stream
         while (this.position < this.tokens.length && !this.match(TokenType.EOF)) {
             // Find the end of the current program
             const programStart = this.position;
             const programEnd = this.findProgramEnd(programStart);
-
-            // debug log to let me know which program is parsing 
-            //this.addLog('INFO', `PARSER: Processing program ${this.programCounter} from position ${programStart} to ${programEnd}`);
-
-            // Check for lexical errors
-            if (this.hasLexicalErrors(programStart, programEnd)) {
+    
+            this.addLog('INFO', `PARSER: Processing program ${this.programCounter} from position ${programStart} to ${programEnd}`);
+    
+            // Check for lexical errors in the current program range
+            if (this.hasLexicalErrors(programStart, programEnd, this.logs)) {
                 this.addLog('WARNING', `PARSER: Program ${this.programCounter} has lexical errors, skipping`);
                 // Skip to the next program
                 this.position = programEnd;
                 this.programCounter++;
-                continue;
+                continue; // Skip this program and move to the next one
             }
-
+    
             // No lexical errors, attempt parsing
             this.addLog('INFO', `PARSER: Parsing program ${this.programCounter}...`);
             const programNode = this.parseProgram();
-
+    
             if (programNode) {
                 this.addChild(rootNode, programNode);
                 hasParsedAnyProgram = true;
@@ -166,10 +178,10 @@ export class Parser {
                 // Error recovery: skip to next program
                 this.position = programEnd;
             }
-
+    
             this.programCounter++;
         }
-
+    
         if (this.errors > 0) {
             this.addLog('ERROR', `PARSER: Parse completed with ${this.errors} error(s)`);
         } else if (hasParsedAnyProgram) {
@@ -177,7 +189,7 @@ export class Parser {
         } else {
             this.addLog('WARNING', 'PARSER: No valid programs found to parse');
         }
-
+    
         // Return the root node if we parsed at least one program, otherwise null
         return {
             ast: hasParsedAnyProgram ? rootNode : null,
@@ -209,6 +221,7 @@ export class Parser {
             this.addLog('WARNING', 'PARSER: Reached end of input while skipping');
         }
     }
+
 
     // Parse program (starting rule)
     private parseProgram(): ASTNode | null {
