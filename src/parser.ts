@@ -46,7 +46,7 @@ export class Parser {
         const current = this.currentToken();
 
         if (current.type === expectedType) {
-           // this.addLog('DEBUG', `PARSER: Consumed ${expectedType} [ ${current.value} ]`);
+            // this.addLog('DEBUG', `PARSER: Consumed ${expectedType} [ ${current.value} ]`);
             this.advance();
             return current;
         } else {
@@ -88,14 +88,48 @@ export class Parser {
         parent.children.push(child);
     }
 
+    // Finds the end position of the current program
+    private findProgramEnd(startPos: number): number {
+        let depth = 0;
+        let i = startPos;
+
+        // Skip to the next EOP or EOF
+        while (i < this.tokens.length) {
+            const token = this.tokens[i];
+
+            if (token.type === TokenType.OPEN_BLOCK) {
+                depth++;
+            } else if (token.type === TokenType.CLOSE_BLOCK) {
+                depth--;
+            } else if (token.type === TokenType.EOP) {
+                return i + 1; // Include the EOP token
+            } else if (token.type === TokenType.EOF) {
+                return i;
+            }
+
+            i++;
+        }
+
+        return this.tokens.length;
+    }
+
+    // checks if there is lex errors and if so skips parsing 
+    private hasLexicalErrors(startPos: number, endPos: number): boolean {
+        // Check if any token in the range [startPos, endPos) has an error
+        for (let i = startPos; i < endPos; i++) {
+            if (i < this.tokens.length && (this.tokens[i] as any).hasError) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // Main parse program that allows for multiple programs 
     // Modified parse method that works with your token types
     public parse(): ParserResult {
-        
+
         // debug log 
         console.log("Initial tokens:", this.tokens.map(t => `${t.type}:${t.value}`).join(', '));
-
-        this.addLog('DEBUG', 'PARSER: parse()');
 
         // Create a root node to hold all programs
         const rootNode = this.createNode('Programs');
@@ -103,35 +137,43 @@ export class Parser {
 
         // Parse each program until we reach the end of the token stream
         while (this.position < this.tokens.length && !this.match(TokenType.EOF)) {
-            // debug log 
-            console.log(`Current position: ${this.position}, token: ${this.currentToken().type}:${this.currentToken().value}`);
+            // Find the end of the current program
+            const programStart = this.position;
+            const programEnd = this.findProgramEnd(programStart);
 
-            this.addLog('INFO', `PARSER: Parsing program ${this.programCounter}...`);
+            // debug log to let me know which program is parsing 
+            //this.addLog('INFO', `PARSER: Processing program ${this.programCounter} from position ${programStart} to ${programEnd}`);
 
-            // Check if we've reached the end of input
-            if (this.position >= this.tokens.length || this.match(TokenType.EOF)) {
-                break;
+            // Check for lexical errors
+            if (this.hasLexicalErrors(programStart, programEnd)) {
+                this.addLog('WARNING', `PARSER: Program ${this.programCounter} has lexical errors, skipping`);
+                // Skip to the next program
+                this.position = programEnd;
+                this.programCounter++;
+                continue;
             }
 
+            // No lexical errors, attempt parsing
+            this.addLog('INFO', `PARSER: Parsing program ${this.programCounter}...`);
             const programNode = this.parseProgram();
-
-            // debug log 
-            console.log(`After parsing program, position: ${this.position}, token: ${this.currentToken().type}:${this.currentToken().value}`);
 
             if (programNode) {
                 this.addChild(rootNode, programNode);
-                this.programCounter++;
                 hasParsedAnyProgram = true;
+                this.addLog('INFO', `PARSER: Program ${this.programCounter} parsed successfully`);
             } else {
+                this.addLog('ERROR', `PARSER: Program ${this.programCounter} has syntax errors`);
                 // Error recovery: skip to next program
-                this.skipToNextProgram();
+                this.position = programEnd;
             }
+
+            this.programCounter++;
         }
 
         if (this.errors > 0) {
-            this.addLog('ERROR', `PARSER: Parse failed with ${this.errors} error(s)`);
+            this.addLog('ERROR', `PARSER: Parse completed with ${this.errors} error(s)`);
         } else if (hasParsedAnyProgram) {
-            this.addLog('INFO', `PARSER: Parse completed successfully with ${this.programCounter - 1} program(s)`);
+            this.addLog('INFO', `PARSER: Parse completed successfully with ${this.programCounter - 1} program(s) processed`);
         } else {
             this.addLog('WARNING', 'PARSER: No valid programs found to parse');
         }
@@ -142,6 +184,8 @@ export class Parser {
             logs: this.logs
         };
     }
+
+
     // Skip tokens until we find the start of a new program
     private skipToNextProgram(): void {
         this.addLog('WARNING', `PARSER: Skipping to next program after error at line ${this.currentToken().line}, column ${this.currentToken().column}`);
@@ -645,7 +689,7 @@ export class Parser {
         }
     }
 
-    // Method to print the CST in a readable format
+    // Method to print the CST in a readable format as well as document any errors while parsing
     public printCST(node: ASTNode | null, indent: string = ''): string {
         if (!node) return 'No parse tree available.';
 
@@ -661,10 +705,17 @@ export class Parser {
                     output += '\n'; // Add separation between programs
                 }
             }
+
+            // If there were programs with errors, indicate that
+            if (this.programCounter > node.children.length + 1) {
+                const skippedCount = this.programCounter - node.children.length - 1;
+                output += `\n${skippedCount} program(s) had errors and were not included in the CST.`;
+            }
+
             return output;
         }
 
-        // Add node information
+        // Regular node handling
         if (node.token) {
             output += `${indent}[${node.token.value}]\n`;
         } else {
