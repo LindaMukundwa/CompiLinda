@@ -136,6 +136,8 @@ export class Parser {
     // Modified parse method that works with your token types
     // updated parse function to skip programs with lex errors from logs array
     public parse(): ParserResult {
+
+        this.addLog('DEBUG', 'PARSER: parse()');
         // Create a root node to hold all programs
         const rootNode = this.createNode('Programs');
         let hasParsedAnyProgram = false;
@@ -221,7 +223,7 @@ export class Parser {
 
     // Parse program (starting rule)
     private parseProgram(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parseProgram()');
+        this.addLog('INFO', 'PARSER: parseProgram()');
     
         const programNode = this.createNode('Program');
         const errorCountBefore = this.errors;
@@ -241,10 +243,15 @@ export class Parser {
         }
     
         // Consume end of program marker
-        const eop = this.consume(TokenType.EOP, "Expected end of program marker '$'");
-        if (eop) {
-            this.addChild(programNode, this.createNode('EOP', eop));
+        if (this.match(TokenType.EOP)) {
+            const eop = this.consume(TokenType.EOP, "Expected end of program marker '$'");
+            if (eop) {
+                this.addChild(programNode, this.createNode('EOP', eop));
+            } else {
+                return null;
+            }
         } else {
+            this.handleError("Expected end of program marker '$'", this.currentToken());
             return null;
         }
     
@@ -252,16 +259,16 @@ export class Parser {
         if (this.errors > errorCountBefore) {
             return null;
         }
-        
+    
         return programNode;
     }
 
     // Parse block
     private parseBlock(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER: parseBlock()');
-
+    
         const blockNode = this.createNode('Block');
-
+    
         // Consume left brace
         const leftBrace = this.consume(TokenType.OPEN_BLOCK, "Expected '{'");
         if (leftBrace) {
@@ -269,13 +276,13 @@ export class Parser {
         } else {
             return null;
         }
-
-        // Parse statement list
+    
+        // Parse statement list (can be empty)
         const statementListNode = this.parseStatementList();
         if (statementListNode) {
             this.addChild(blockNode, statementListNode);
         }
-
+    
         // Consume right brace
         const rightBrace = this.consume(TokenType.CLOSE_BLOCK, "Expected '}'");
         if (rightBrace) {
@@ -283,21 +290,21 @@ export class Parser {
         } else {
             return null;
         }
-
+    
         return blockNode;
     }
 
-    // Parse statement list
+
     private parseStatementList(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER: parseStatementList()');
-
+    
         const statementListNode = this.createNode('StatementList');
-
+    
         // If the next token is a closing brace, this is an empty statement list
         if (this.match(TokenType.CLOSE_BLOCK)) {
             return statementListNode;
         }
-
+    
         // Parse statements until we reach a closing brace
         while (!this.match(TokenType.CLOSE_BLOCK) && !this.match(TokenType.EOP)) {
             const statementNode = this.parseStatement();
@@ -308,7 +315,7 @@ export class Parser {
                 this.skipToNextStatement();
             }
         }
-
+    
         return statementListNode;
     }
 
