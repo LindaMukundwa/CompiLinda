@@ -328,6 +328,7 @@ export class Parser {
 
     // Parse statement
     private parseStatement(): ASTNode | null {
+        this.addLog('DEBUG', 'PARSER: parseStatement()');
         const current = this.currentToken();
 
         if (this.match(TokenType.PRINT)) {
@@ -350,6 +351,7 @@ export class Parser {
 
     // Parse print statement
     private parsePrintStatement(): ASTNode | null {
+        this.addLog('DEBUG', 'PARSER: parsePrintStatement()');
         const printNode = this.createNode('PrintStatement');
 
         // Consume print keyword
@@ -398,6 +400,7 @@ export class Parser {
 
     // Parse string expression (for print statements)
     private parseStringExpression(): ASTNode | null {
+        this.addLog('DEBUG', 'PARSER: parseStringExpression()');
         const stringNode = this.createNode('StringExpression');
 
         // Consume opening quote
@@ -429,6 +432,7 @@ export class Parser {
 
     // Parse variable declaration
     private parseVariableDeclaration(): ASTNode | null {
+        this.addLog('DEBUG', 'PARSER: parseVariableDeclr()');
         const declNode = this.createNode('VariableDeclaration');
 
         // Parse type
@@ -484,6 +488,7 @@ export class Parser {
 
     // Parse assignment statement
     private parseAssignmentStatement(): ASTNode | null {
+        this.addLog('DEBUG', 'PARSER: parseAssignmentStatement()');
         const assignNode = this.createNode('AssignmentStatement');
 
         // Parse identifier
@@ -516,6 +521,7 @@ export class Parser {
 
     // Parse while statement
     private parseWhileStatement(): ASTNode | null {
+        this.addLog('DEBUG', 'PARSER: parseWhileStatement()');
         const whileNode = this.createNode('WhileStatement');
 
         // Consume while keyword
@@ -547,6 +553,7 @@ export class Parser {
 
     // Parse if statement
     private parseIfStatement(): ASTNode | null {
+        this.addLog('DEBUG', 'PARSER: parseIfStatement()');
         const ifNode = this.createNode('IfStatement');
 
         // Consume if keyword
@@ -599,6 +606,7 @@ export class Parser {
 
     // Parse boolean expression
     private parseBooleanExpression(): ASTNode | null {
+        this.addLog('DEBUG', 'PARSER: parseBoolean()');
         const boolNode = this.createNode('BooleanExpression');
 
         // Parse left expression
@@ -642,6 +650,7 @@ export class Parser {
 
     // Parse expression
     private parseExpression(): ASTNode | null {
+        this.addLog('DEBUG', 'PARSER: parseExpression()');
         const exprNode = this.createNode('Expression');
 
         // Parse term
@@ -675,6 +684,7 @@ export class Parser {
 
     // Parse term
     private parseTerm(): ASTNode | null {
+        this.addLog('DEBUG', 'PARSER: parseTerm()');
         const current = this.currentToken();
 
         if (this.match(TokenType.DIGIT)) {
@@ -707,9 +717,9 @@ export class Parser {
     // Method to print the CST in a readable format as well as document any errors while parsing
     public printCST(node: ASTNode | null, indent: string = ''): string {
         if (!node) return 'No parse tree available.';
-
+    
         let output = '';
-
+    
         // Special handling for root node
         if (node.name === 'Programs') {
             output += 'Programs Root:\n';
@@ -720,30 +730,30 @@ export class Parser {
                     output += '\n'; // Add separation between programs
                 }
             }
-
+    
             // If there were programs with errors, indicate that
             if (this.programCounter > node.children.length + 1) {
                 const skippedCount = this.programCounter - node.children.length - 1;
                 output += `\n${skippedCount} program(s) had errors and were not included in the CST.`;
             }
-
+    
             return output;
         }
-
+    
         // Regular node handling
         if (node.token) {
             output += `${indent}[${node.token.value}]\n`;
         } else {
             if (node.name !== 'StatementList') {
-                output += `${indent}[${node.name}]\n`;
+                output += `${indent}<${node.name}>\n`;
             }
         }
-
+    
         // Process children
         for (const child of node.children) {
             output += this.printCST(child, indent + '--');
         }
-
+    
         return output;
     }
 }
