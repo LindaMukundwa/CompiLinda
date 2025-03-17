@@ -148,7 +148,7 @@ export class Parser {
             // Find the end of the current program
             const programEnd = this.findProgramEnd(programStart);
             
-            this.addLog('INFO', `PARSER: Processing program ${this.programCounter} from position ${programStart} to ${programEnd}`);
+           // this.addLog('INFO', `PARSER: Processing program ${this.programCounter} from position ${programStart} to ${programEnd}`);
             
             // Check for lexical errors specifically for this program segment
             if (this.hasLexicalErrors(programStart, programEnd)) {
