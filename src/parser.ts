@@ -136,8 +136,6 @@ export class Parser {
     // Modified parse method that works with your token types
     // updated parse function to skip programs with lex errors from logs array
     public parse(): ParserResult {
-
-        this.addLog('DEBUG', 'PARSER: parse()');
         // Create a root node to hold all programs
         const rootNode = this.createNode('Programs');
         let hasParsedAnyProgram = false;
@@ -164,6 +162,7 @@ export class Parser {
             // No lexical errors, attempt parsing
             const errorsBefore = this.errors;
             this.addLog('INFO', `PARSER: Parsing program ${this.programCounter}...`);
+            this.addLog('DEBUG', 'PARSER: parse()');
             const programNode = this.parseProgram();
             
             // Check if parsing was successful (no new errors)
@@ -223,7 +222,7 @@ export class Parser {
 
     // Parse program (starting rule)
     private parseProgram(): ASTNode | null {
-        this.addLog('INFO', 'PARSER: parseProgram()');
+        this.addLog('DEBUG', 'PARSER: parseProgram()');
     
         const programNode = this.createNode('Program');
         const errorCountBefore = this.errors;
