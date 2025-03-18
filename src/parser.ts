@@ -16,6 +16,7 @@ export interface ASTNode {
 export interface ParserResult {
     ast: ASTNode | null;
     logs: LexerLog[];
+    hasErrors: boolean; // Added flag to indicate if there are any errors
 }
 
 export class Parser {
@@ -25,10 +26,13 @@ export class Parser {
     private errors: number = 0;
     //private warnings: number = 0;
     private programCounter: number = 1;
+    private lexerLogs: LexerLog[] = []; // Store lexer logs separately
 
-    constructor(tokens: Token[]) {
+    constructor(tokens: Token[], lexerLogs: LexerLog[] = []) {
         this.tokens = tokens;
-        this.addLog('INFO', `PARSER: Parsing program ${this.programCounter}...`);
+        this.lexerLogs = lexerLogs; // Store the lexer logs
+        this.logs = [...lexerLogs]; // Include lexer logs in our logs
+        this.addLog('INFO', `PARSER -- Parsing program ${this.programCounter}...`);
     }
 
     // Get the current token
@@ -41,18 +45,37 @@ export class Parser {
         this.position++;
     }
 
-    // Consume the current token if it matches the expected type
+    // Updated consume method for better error tracking
     private consume(expectedType: TokenType, errorMessage: string): Token | null {
         const current = this.currentToken();
 
         if (current.type === expectedType) {
-            // this.addLog('DEBUG', `PARSER: Consumed ${expectedType} [ ${current.value} ]`);
+            this.addLog('DEBUG', `PARSER -- Parsing Found ${expectedType}`);
             this.advance();
             return current;
         } else {
-            this.handleError(errorMessage, current);
+            this.handleError(`${errorMessage}, got ${current.type} [${current.value}]`, current);
             return null;
         }
+    }
+
+    // Maximum iterations guard to prevent infinite loops
+    private parseWithMaxIterations<T>(parseFunc: () => T | null, maxIterations: number = 1000): T | null {
+        const startPosition = this.position;
+        let iterations = 0;
+
+        const result = parseFunc();
+
+        if (this.position === startPosition) {
+            iterations++;
+            if (iterations >= maxIterations) {
+                this.addLog('ERROR', 'PARSER -- Maximum iterations reached, possible infinite loop');
+                // Force position advance to get out the loop
+                this.advance();
+            }
+        }
+
+        return result;
     }
 
     // Check if the current token matches the expected type without consuming it
@@ -60,7 +83,7 @@ export class Parser {
         return this.currentToken().type === type;
     }
 
-    // Add log
+    // Adding log
     private addLog(level: 'INFO' | 'DEBUG' | 'ERROR' | 'WARNING', message: string): void {
         this.logs.push({
             level,
@@ -68,10 +91,10 @@ export class Parser {
         });
     }
 
-    // Handle error
+    // Handling error log
     private handleError(message: string, token: Token): void {
         this.errors++;
-        this.addLog('ERROR', `PARSER: Error:${token.line}:${token.column} ${message}`);
+        this.addLog('ERROR', `PARSER -- Error:${token.line}:${token.column} ${message}`);
     }
 
     // Create a new AST node
@@ -92,33 +115,34 @@ export class Parser {
     // updated code to make sure it handles if tokens may be out of order or sync
     private findProgramEnd(startPos: number): number {
         let i = startPos;
-        
+
         // Skip to the next EOP or EOF
         while (i < this.tokens.length) {
             const token = this.tokens[i];
-            
+
             if (token.type === TokenType.EOP) {
                 return i + 1; // Include the EOP token
             } else if (token.type === TokenType.EOF) {
                 return i;
             }
-            
+
             i++;
         }
-        
+
         return this.tokens.length;
     }
 
-    // updated function to check for errors within each singular program and stopping parsing
-    // instead of skipping entire parse by checking logs array for ERROR
+    // Check if any lexical errors exist for the current program segment
     private hasLexicalErrors(startPos: number, endPos: number): boolean {
         // Get line ranges for the current program
+        if (startPos >= this.tokens.length) return false;
+
         const programStartLine = this.tokens[startPos].line;
         const programEndLine = this.tokens[Math.min(endPos - 1, this.tokens.length - 1)].line;
-        
-        // Check if any errors fall within the line range of the current program
-        for (const log of this.logs) {
-            if (log.level === 'ERROR' && log.message.startsWith('Lexer - Error:')) {
+
+        // Check if any lexer errors fall within the line range of the current program
+        for (const log of this.lexerLogs) {
+            if (log.level === 'ERROR') {
                 const match = log.message.match(/Error:(\d+):/);
                 if (match) {
                     const errorLine = parseInt(match[1], 10);
@@ -133,71 +157,67 @@ export class Parser {
     }
 
     // Main parse program that allows for multiple programs 
-    // Modified parse method that works with your token types
-    // updated parse function to skip programs with lex errors from logs array
     public parse(): ParserResult {
         // Create a root node to hold all programs
         const rootNode = this.createNode('Programs');
         let hasParsedAnyProgram = false;
-        
+
         // Parse each program until we reach the end of the token stream
         while (this.position < this.tokens.length && !this.match(TokenType.EOF)) {
             // Store the start position of this program
             const programStart = this.position;
-            
+
             // Find the end of the current program
             const programEnd = this.findProgramEnd(programStart);
-            
-           // this.addLog('INFO', `PARSER: Processing program ${this.programCounter} from position ${programStart} to ${programEnd}`);
-            
+
             // Check for lexical errors specifically for this program segment
             if (this.hasLexicalErrors(programStart, programEnd)) {
-                this.addLog('WARNING', `PARSER: Program ${this.programCounter} has lexical errors, skipping`);
+                this.addLog('WARNING', `PARSER -- Program ${this.programCounter} has lexical errors, skipping parsing`);
                 // Skip to the next program
                 this.position = programEnd;
                 this.programCounter++;
                 continue; // Skip this program and move to the next one
             }
-            
+
             // No lexical errors, attempt parsing
             const errorsBefore = this.errors;
-            this.addLog('INFO', `PARSER: Parsing program ${this.programCounter}...`);
-            this.addLog('DEBUG', 'PARSER: parse()');
+            this.addLog('INFO', `PARSER -- Parsing program ${this.programCounter}...`);
+            this.addLog('DEBUG', 'PARSER -- parse()');
             const programNode = this.parseProgram();
-            
+
             // Check if parsing was successful (no new errors)
             if (programNode && this.errors === errorsBefore) {
                 this.addChild(rootNode, programNode);
                 hasParsedAnyProgram = true;
-                this.addLog('INFO', `PARSER: Program ${this.programCounter} parsed successfully`);
+                this.addLog('INFO', `PARSER -- Program ${this.programCounter} parsed successfully`);
             } else {
-                this.addLog('ERROR', `PARSER: Program ${this.programCounter} has syntax errors`);
+                this.addLog('ERROR', `PARSER -- Program ${this.programCounter} has syntax errors, skipping CST generation`);
                 // Error recovery: advance to next program
                 this.position = programEnd;
             }
-            
+
             this.programCounter++;
         }
-        
+
         // Final reporting
         if (this.errors > 0) {
-            this.addLog('ERROR', `PARSER: Parse completed with ${this.errors} error(s)`);
+            this.addLog('ERROR', `PARSER -- Parse completed with ${this.errors} error(s)`);
         } else if (hasParsedAnyProgram) {
-            this.addLog('INFO', `PARSER: Parse completed successfully with ${this.programCounter - 1} program(s) processed`);
+            this.addLog('INFO', `PARSER -- Parse completed successfully with ${this.programCounter - 1} program(s) processed`);
         } else {
-            this.addLog('WARNING', 'PARSER: No valid programs found to parse');
+            this.addLog('WARNING', 'PARSER -- No valid programs found to parse');
         }
-        
+
         return {
             ast: hasParsedAnyProgram ? rootNode : null,
-            logs: this.logs
+            logs: this.logs,
+            hasErrors: this.errors > 0
         };
     }
 
-
     // Skip tokens until we find the start of a new program
     private skipToNextProgram(): void {
-        this.addLog('WARNING', `PARSER: Skipping to next program after error at line ${this.currentToken().line}, column ${this.currentToken().column}`);
+        this.addLog('WARNING', `PARSER -- Skipping to next program after error at line ${this.currentToken().line}, column ${this.currentToken().column}`);
 
         // Keep track of whether we've seen an EOP token
         let foundEOP = false;
@@ -213,38 +233,40 @@ export class Parser {
         }
 
         if (foundEOP) {
-            this.addLog('INFO', 'PARSER: Found next program start');
+            this.addLog('INFO', 'PARSER -- Found next program start');
         } else {
-            this.addLog('WARNING', 'PARSER: Reached end of input while skipping');
+            this.addLog('WARNING', 'PARSER -- Reached end of input while skipping');
         }
     }
 
-
-    // Parse program (starting rule)
+    // Parse program (starting rule) with more loggin
     private parseProgram(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parseProgram()');
-    
+        this.addLog('DEBUG', 'PARSER -- parseProgram()');
+
         const programNode = this.createNode('Program');
         const errorCountBefore = this.errors;
-    
+
         // Check if we're at the start of a program (should be an open block)
         if (!this.match(TokenType.OPEN_BLOCK)) {
             this.handleError("Expected '{' to start program", this.currentToken());
             return null;
         }
-    
+
         // Parse block
+        this.addLog('DEBUG', 'PARSER -- Parsing Attempting to parse Block');
         const blockNode = this.parseBlock();
         if (blockNode) {
             this.addChild(programNode, blockNode);
         } else {
             return null;
         }
-    
+
         // Consume end of program marker
         if (this.match(TokenType.EOP)) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Expecting EOP ($)');
             const eop = this.consume(TokenType.EOP, "Expected end of program marker '$'");
             if (eop) {
+                this.addLog('DEBUG', 'PARSER -- Parsing Found EOP');
                 this.addChild(programNode, this.createNode('EOP', eop));
             } else {
                 return null;
@@ -253,71 +275,94 @@ export class Parser {
             this.handleError("Expected end of program marker '$'", this.currentToken());
             return null;
         }
-    
+
         // Only return the program node if no errors were encountered during parsing
         if (this.errors > errorCountBefore) {
             return null;
         }
-    
+
+        this.addLog('DEBUG', 'PARSER -- Parsing Program parsed successfully');
         return programNode;
     }
 
     // Parse block
+    // Add more detailed logs to parseBlock
     private parseBlock(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parseBlock()');
-    
+        this.addLog('DEBUG', 'PARSER -- parsingBlock()');
+
         const blockNode = this.createNode('Block');
-    
+
         // Consume left brace
+        this.addLog('DEBUG', 'PARSER -- Parsing Expecting LBRACE ({)');
         const leftBrace = this.consume(TokenType.OPEN_BLOCK, "Expected '{'");
         if (leftBrace) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found LBRACE');
             this.addChild(blockNode, this.createNode('OpenBlock', leftBrace));
         } else {
             return null;
         }
-    
+
         // Parse statement list (can be empty)
+        this.addLog('DEBUG', 'PARSER -- Parsing Attempting to parse StatementList');
         const statementListNode = this.parseStatementList();
         if (statementListNode) {
             this.addChild(blockNode, statementListNode);
         }
-    
+
         // Consume right brace
+        this.addLog('DEBUG', 'PARSER -- Parsing Expecting RBRACE (})');
         const rightBrace = this.consume(TokenType.CLOSE_BLOCK, "Expected '}'");
         if (rightBrace) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found RBRACE');
             this.addChild(blockNode, this.createNode('CloseBlock', rightBrace));
         } else {
             return null;
         }
-    
+
+        this.addLog('DEBUG', 'PARSER -- Parsing Block parsed successfully');
         return blockNode;
     }
 
 
+    // Fix the statement list to prevent infinite loops
     private parseStatementList(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parseStatementList()');
-    
+        this.addLog('DEBUG', 'PARSER -- parseStatementList');
+
         const statementListNode = this.createNode('StatementList');
-    
+
         // If the next token is a closing brace, this is an empty statement list
         if (this.match(TokenType.CLOSE_BLOCK)) {
+            this.addLog('DEBUG', 'PARSER -- Parsing No valid statement found');
+            this.addLog('DEBUG', 'PARSER -- Parsing No more statements found (ε production)');
             return statementListNode;
         }
-    
-        // Parse statements until we reach a closing brace
-        while (!this.match(TokenType.CLOSE_BLOCK) && !this.match(TokenType.EOP)) {
+
+        // Parse statements until we reach a closing brace or end of program
+        while (!this.match(TokenType.CLOSE_BLOCK) && !this.match(TokenType.EOP) && !this.match(TokenType.EOF)) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Attempting to parse Statement');
+            const positionBefore = this.position;
             const statementNode = this.parseStatement();
+
             if (statementNode) {
                 this.addChild(statementListNode, statementNode);
+                this.addLog('DEBUG', 'PARSER -- Parsing Statement parsed successfully');
+                this.addLog('DEBUG', 'PARSER -- Parsing Recursively parsing StatementList');
             } else {
                 // Error recovery: skip to next statement or end of block
+                this.addLog('WARNING', 'PARSER -- Parsing No valid statement found');
                 this.skipToNextStatement();
             }
+
+            // Check for infinite loop - if position didn't change, force advance
+            if (positionBefore === this.position) {
+                this.addLog('ERROR', `PARSER -- Infinite loop detected at token ${this.currentToken().value}, forcing advance`);
+                this.advance();
+            }
         }
-    
+
+        this.addLog('DEBUG', 'PARSER -- Parsing StatementList parsed successfully');
         return statementListNode;
     }
-
     // Skip tokens until we find a valid statement start or end of block
     private skipToNextStatement(): void {
         while (!this.match(TokenType.EOP) && !this.match(TokenType.CLOSE_BLOCK)) {
@@ -333,31 +378,41 @@ export class Parser {
     }
 
     // Parse statement
+    // Add more detailed logging to parseStatement
     private parseStatement(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parseStatement()');
+        this.addLog('DEBUG', 'PARSER -- parseStatement()');
         const current = this.currentToken();
 
+        this.addLog('DEBUG', `PARSER -- Parsing Current token: ${current.type} [${current.value}]`);
+
         if (this.match(TokenType.PRINT)) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found PRINT statement');
             return this.parsePrintStatement();
         } else if (this.match(TokenType.I_TYPE) || this.match(TokenType.S_TYPE) || this.match(TokenType.B_TYPE)) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found TYPE declaration');
             return this.parseVariableDeclaration();
         } else if (this.match(TokenType.IDENTIFIER)) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found ID (assignment)');
             return this.parseAssignmentStatement();
         } else if (this.match(TokenType.WHILE)) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found WHILE statement');
             return this.parseWhileStatement();
         } else if (this.match(TokenType.IF)) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found IF statement');
             return this.parseIfStatement();
         } else if (this.match(TokenType.OPEN_BLOCK)) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found nested block');
             return this.parseBlock();
         } else {
             this.handleError(`Unexpected token: ${current.value}`, current);
+            this.addLog('DEBUG', 'PARSER -- Parsing No valid statement found');
             return null;
         }
     }
 
-    // Parse print statement
+    // Parse print statement with better logging
     private parsePrintStatement(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parsePrintStatement()');
+        this.addLog('DEBUG', 'PARSER -- parsePrintStatement()');
         const printNode = this.createNode('PrintStatement');
 
         // Consume print keyword
@@ -369,14 +424,17 @@ export class Parser {
         }
 
         // Consume left parenthesis
+        this.addLog('DEBUG', 'PARSER -- Parsing Expecting LPAREN');
         const leftParen = this.consume(TokenType.LEFT_PAREN, "Expected '(' after 'print'");
         if (leftParen) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found LPAREN');
             this.addChild(printNode, this.createNode('LeftParen', leftParen));
         } else {
             return null;
         }
 
         // Parse expression
+        this.addLog('DEBUG', 'PARSER -- Parsing Attempting to parse expression');
         if (this.match(TokenType.QUOTE)) {
             const stringNode = this.parseStringExpression();
             if (stringNode) {
@@ -394,19 +452,22 @@ export class Parser {
         }
 
         // Consume right parenthesis
+        this.addLog('DEBUG', 'PARSER -- Parsing Expecting RPAREN');
         const rightParen = this.consume(TokenType.RIGHT_PAREN, "Expected ')' to close print statement");
         if (rightParen) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found RPAREN');
             this.addChild(printNode, this.createNode('RightParen', rightParen));
         } else {
             return null;
         }
 
+        this.addLog('DEBUG', 'PARSER -- Parsing PrintStatement parsed successfully');
         return printNode;
     }
 
     // Parse string expression (for print statements)
     private parseStringExpression(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parseStringExpression()');
+        this.addLog('DEBUG', 'PARSER -- parseStringExpression()');
         const stringNode = this.createNode('StringExpression');
 
         // Consume opening quote
@@ -438,7 +499,7 @@ export class Parser {
 
     // Parse variable declaration
     private parseVariableDeclaration(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parseVariableDeclr()');
+        this.addLog('DEBUG', 'PARSER -- parseVariableDeclr()');
         const declNode = this.createNode('VariableDeclaration');
 
         // Parse type
@@ -494,7 +555,7 @@ export class Parser {
 
     // Parse assignment statement
     private parseAssignmentStatement(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parseAssignmentStatement()');
+        this.addLog('DEBUG', 'PARSER -- parseAssignmentStatement()');
         const assignNode = this.createNode('AssignmentStatement');
 
         // Parse identifier
@@ -527,7 +588,7 @@ export class Parser {
 
     // Parse while statement
     private parseWhileStatement(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parseWhileStatement()');
+        this.addLog('DEBUG', 'PARSER -- parseWhileStatement()');
         const whileNode = this.createNode('WhileStatement');
 
         // Consume while keyword
@@ -559,7 +620,7 @@ export class Parser {
 
     // Parse if statement
     private parseIfStatement(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parseIfStatement()');
+        this.addLog('DEBUG', 'PARSER -- parseIfStatement()');
         const ifNode = this.createNode('IfStatement');
 
         // Consume if keyword
@@ -588,8 +649,6 @@ export class Parser {
 
         // Parse optional else part
         if (this.match(TokenType.ELSE)) {
-
-
             const elseToken = this.consume(TokenType.ELSE, "");
             if (elseToken) {
                 const elseNode = this.createNode('ElseKeyword', elseToken);
@@ -612,7 +671,7 @@ export class Parser {
 
     // Parse boolean expression
     private parseBooleanExpression(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parseBoolean()');
+        this.addLog('DEBUG', 'PARSER -- parseBoolean()');
         const boolNode = this.createNode('BooleanExpression');
 
         // Parse left expression
@@ -654,43 +713,45 @@ export class Parser {
         return boolNode;
     }
 
-    // Parse expression
+    // Parse expression with more detailed logginf
     private parseExpression(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parseExpression()');
+        this.addLog('DEBUG', 'PARSER -- parseExpression()');
         const exprNode = this.createNode('Expression');
+        const current = this.currentToken();
 
-        // Parse term
-        const termNode = this.parseTerm();
-        if (termNode) {
-            this.addChild(exprNode, termNode);
-        } else {
-            return null;
-        }
+        this.addLog('DEBUG', `PARSER -- Parsing Current token: ${current.type} [${current.value}]`);
 
-        // Check for int operation
-        if (this.match(TokenType.INT_OP)) {
-            const opToken = this.consume(TokenType.INT_OP, "");
-            if (opToken) {
-                this.addChild(exprNode, this.createNode('IntOp', opToken));
-
-                // Parse right term
-                const rightTerm = this.parseTerm();
-                if (rightTerm) {
-                    this.addChild(exprNode, rightTerm);
-                } else {
-                    return null;
-                }
+        // Special handling for parenthesized expressions or boolean literals
+        if (this.match(TokenType.LEFT_PAREN) || this.match(TokenType.BOOLEAN_VALUE)) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found LPAREN or BOOLVAL (BooleanExpr)');
+            // Handle specific expression type here...
+        } else if (this.match(TokenType.DIGIT)) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found DIGIT (IntExpr)');
+            // Handle integer expression...
+        } else if (this.match(TokenType.IDENTIFIER)) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found ID');
+            const identToken = this.consume(TokenType.IDENTIFIER, "");
+            if (identToken) {
+                this.addLog('DEBUG', 'PARSER -- Parsing ID parsed successfully');
+                this.addChild(exprNode, this.createNode('Identifier', identToken));
             } else {
                 return null;
             }
+        } else if (this.match(TokenType.QUOTE)) {
+            this.addLog('DEBUG', 'PARSER -- Parsing Found QUOTE (StringExpr)');
+            // Handle string expression...
+        } else {
+            this.handleError(`Expected expression, got ${current.value}`, current);
+            return null;
         }
 
+        this.addLog('DEBUG', 'PARSER -- Parsing Expression parsed successfully');
         return exprNode;
     }
 
     // Parse term
     private parseTerm(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER: parseTerm()');
+        this.addLog('DEBUG', 'PARSER -- parseTerm()');
         const current = this.currentToken();
 
         if (this.match(TokenType.DIGIT)) {
@@ -720,12 +781,12 @@ export class Parser {
         }
     }
 
-    // Method to print the CST in a readable format as well as document any errors while parsing
+    // Method to print the CST in a readable format
     public printCST(node: ASTNode | null, indent: string = ''): string {
         if (!node) return 'No parse tree available.';
-    
+
         let output = '';
-    
+
         // Special handling for root node
         if (node.name === 'Programs') {
             output += 'Programs Root:\n';
@@ -736,16 +797,16 @@ export class Parser {
                     output += '\n'; // Add separation between programs
                 }
             }
-    
+
             // If there were programs with errors, indicate that
             if (this.programCounter > node.children.length + 1) {
                 const skippedCount = this.programCounter - node.children.length - 1;
                 output += `\n${skippedCount} program(s) had errors and were not included in the CST.`;
             }
-    
+
             return output;
         }
-    
+
         // Regular node handling
         if (node.token) {
             output += `${indent}[${node.token.value}]\n`;
@@ -754,12 +815,12 @@ export class Parser {
                 output += `${indent}<${node.name}>\n`;
             }
         }
-    
+
         // Process children
         for (const child of node.children) {
             output += this.printCST(child, indent + '--');
         }
-    
+
         return output;
     }
 }
