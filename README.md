@@ -52,7 +52,8 @@ After running the commands above, you can run the compiler by opening the **inde
 
 Once everything looks correct, you should get a webpage that looks like this:
 
-<img width="1470" alt="Screenshot 2025-03-17 at 20 51 51" src="https://github.com/user-attachments/assets/9cb99f38-a382-4cd5-b496-0400ade20e35" />
+<img width="1453" alt="Screenshot 2025-03-17 at 20 59 16" src="https://github.com/user-attachments/assets/242d2c12-3e97-4204-82b8-cc1e367dfca9" />
+
 
 Have fun compiling!
 
