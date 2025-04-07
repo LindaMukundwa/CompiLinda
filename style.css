@@ -101,6 +101,19 @@ h1 {
     background-color: darkblue;
 }
 
+.tab {
+    font-family: "Source Code Pro", serif;
+}
+
+.tab active {
+    font-family: "Source Code Pro", serif;
+}
+
+#parseStatus, #lexerOutput {
+    font-family: "Source Code Pro", serif;
+    font-size: 12px;
+}
+
 textarea {
     color:darkblue;
     text-emphasis-color: green;

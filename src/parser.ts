@@ -50,7 +50,7 @@ export class Parser {
         const current = this.currentToken();
 
         if (current.type === expectedType) {
-            this.addLog('DEBUG', `PARSER -- Parsing Found ${expectedType}`);
+            this.addLog('DEBUG', `PARSER -- Parsing found ${expectedType}`);
             this.advance();
             return current;
         } else {
@@ -253,7 +253,7 @@ export class Parser {
         }
 
         // Parse block
-        this.addLog('DEBUG', 'PARSER -- Parsing Attempting to parse Block');
+        //this.addLog('DEBUG', 'PARSER -- Parsing Attempting to parse Block');
         const blockNode = this.parseBlock();
         if (blockNode) {
             this.addChild(programNode, blockNode);
@@ -281,7 +281,7 @@ export class Parser {
             return null;
         }
 
-        this.addLog('DEBUG', 'PARSER -- Parsing Program parsed successfully');
+        this.addLog('DEBUG', 'PARSER -- Program parsed successfully');
         return programNode;
     }
 
@@ -293,27 +293,27 @@ export class Parser {
         const blockNode = this.createNode('Block');
 
         // Consume left brace
-        this.addLog('DEBUG', 'PARSER -- Parsing Expecting LBRACE ({)');
+        this.addLog('DEBUG', 'PARSER -- Parsing expecting OPEN_BLOCK ({)');
         const leftBrace = this.consume(TokenType.OPEN_BLOCK, "Expected '{'");
         if (leftBrace) {
-            this.addLog('DEBUG', 'PARSER -- Parsing Found LBRACE');
+            this.addLog('DEBUG', 'PARSER -- Parsing found OPEN_BLOCK');
             this.addChild(blockNode, this.createNode('OpenBlock', leftBrace));
         } else {
             return null;
         }
 
         // Parse statement list (can be empty)
-        this.addLog('DEBUG', 'PARSER -- Parsing Attempting to parse StatementList');
+        //this.addLog('DEBUG', 'PARSER -- Parsing Attempting to parse StatementList');
         const statementListNode = this.parseStatementList();
         if (statementListNode) {
             this.addChild(blockNode, statementListNode);
         }
 
         // Consume right brace
-        this.addLog('DEBUG', 'PARSER -- Parsing Expecting RBRACE (})');
+        this.addLog('DEBUG', 'PARSER -- Parsing expecting CLOSE_BLOCK (})');
         const rightBrace = this.consume(TokenType.CLOSE_BLOCK, "Expected '}'");
         if (rightBrace) {
-            this.addLog('DEBUG', 'PARSER -- Parsing Found RBRACE');
+            this.addLog('DEBUG', 'PARSER -- Parsing found CLOSE_BLOCK');
             this.addChild(blockNode, this.createNode('CloseBlock', rightBrace));
         } else {
             return null;
@@ -326,30 +326,30 @@ export class Parser {
 
     // Fix the statement list to prevent infinite loops
     private parseStatementList(): ASTNode | null {
-        this.addLog('DEBUG', 'PARSER -- parseStatementList');
+        this.addLog('DEBUG', 'PARSER -- parseStatementList()');
 
         const statementListNode = this.createNode('StatementList');
 
         // If the next token is a closing brace, this is an empty statement list
         if (this.match(TokenType.CLOSE_BLOCK)) {
-            this.addLog('DEBUG', 'PARSER -- Parsing No valid statement found');
-            this.addLog('DEBUG', 'PARSER -- Parsing No more statements found (ε production)');
+            this.addLog('DEBUG', 'PARSER -- Parsing found no valid statement');
+            this.addLog('DEBUG', 'PARSER -- Parsing found no more statements (ε production)');
             return statementListNode;
         }
 
         // Parse statements until we reach a closing brace or end of program
         while (!this.match(TokenType.CLOSE_BLOCK) && !this.match(TokenType.EOP) && !this.match(TokenType.EOF)) {
-            this.addLog('DEBUG', 'PARSER -- Parsing Attempting to parse Statement');
+            //this.addLog('DEBUG', 'PARSER -- Parsing Attempting to parse Statement');
             const positionBefore = this.position;
             const statementNode = this.parseStatement();
 
             if (statementNode) {
                 this.addChild(statementListNode, statementNode);
                 this.addLog('DEBUG', 'PARSER -- Parsing Statement parsed successfully');
-                this.addLog('DEBUG', 'PARSER -- Parsing Recursively parsing StatementList');
+                this.addLog('DEBUG', 'PARSER -- Parsing StatementList');
             } else {
                 // Error recovery: skip to next statement or end of block
-                this.addLog('WARNING', 'PARSER -- Parsing No valid statement found');
+                this.addLog('DEBUG', 'PARSER -- Parsing found invalid statement');
                 this.skipToNextStatement();
             }
 
@@ -383,7 +383,7 @@ export class Parser {
         this.addLog('DEBUG', 'PARSER -- parseStatement()');
         const current = this.currentToken();
 
-        this.addLog('DEBUG', `PARSER -- Parsing Current token: ${current.type} [${current.value}]`);
+        //this.addLog('DEBUG', `PARSER -- Parsing Current token: ${current.type} [${current.value}]`);
 
         if (this.match(TokenType.PRINT)) {
             this.addLog('DEBUG', 'PARSER -- Parsing Found PRINT statement');
@@ -392,7 +392,7 @@ export class Parser {
             this.addLog('DEBUG', 'PARSER -- Parsing Found TYPE declaration');
             return this.parseVariableDeclaration();
         } else if (this.match(TokenType.IDENTIFIER)) {
-            this.addLog('DEBUG', 'PARSER -- Parsing Found ID (assignment)');
+            this.addLog('DEBUG', 'PARSER -- Parsing Found IDENTIFIER');
             return this.parseAssignmentStatement();
         } else if (this.match(TokenType.WHILE)) {
             this.addLog('DEBUG', 'PARSER -- Parsing Found WHILE statement');
@@ -401,11 +401,11 @@ export class Parser {
             this.addLog('DEBUG', 'PARSER -- Parsing Found IF statement');
             return this.parseIfStatement();
         } else if (this.match(TokenType.OPEN_BLOCK)) {
-            this.addLog('DEBUG', 'PARSER -- Parsing Found nested block');
+            this.addLog('DEBUG', 'PARSER -- Parsing Found OPEN_BLOCK');
             return this.parseBlock();
         } else {
             this.handleError(`Unexpected token: ${current.value}`, current);
-            this.addLog('DEBUG', 'PARSER -- Parsing No valid statement found');
+            this.addLog('DEBUG', 'PARSER -- Parsing found invalid statement');
             return null;
         }
     }
@@ -424,17 +424,17 @@ export class Parser {
         }
 
         // Consume left parenthesis
-        this.addLog('DEBUG', 'PARSER -- Parsing Expecting LPAREN');
+        this.addLog('DEBUG', 'PARSER -- Parsing expecting LPAREN');
         const leftParen = this.consume(TokenType.LEFT_PAREN, "Expected '(' after 'print'");
         if (leftParen) {
-            this.addLog('DEBUG', 'PARSER -- Parsing Found LPAREN');
+            this.addLog('DEBUG', 'PARSER -- Parsing found LPAREN');
             this.addChild(printNode, this.createNode('LeftParen', leftParen));
         } else {
             return null;
         }
 
         // Parse expression
-        this.addLog('DEBUG', 'PARSER -- Parsing Attempting to parse expression');
+        //this.addLog('DEBUG', 'PARSER -- Parsing Attempting to parse expression');
         if (this.match(TokenType.QUOTE)) {
             const stringNode = this.parseStringExpression();
             if (stringNode) {
@@ -719,14 +719,14 @@ export class Parser {
         const exprNode = this.createNode('Expression');
         const current = this.currentToken();
 
-        this.addLog('DEBUG', `PARSER -- Parsing Current token: ${current.type} [${current.value}]`);
+        //this.addLog('DEBUG', `PARSER -- Parsing Current token: ${current.type} [${current.value}]`);
 
         // Special handling for parenthesized expressions or boolean literals
         if (this.match(TokenType.LEFT_PAREN) || this.match(TokenType.BOOLEAN_VALUE)) {
-            this.addLog('DEBUG', 'PARSER -- Parsing Found LPAREN or BOOLVAL (BooleanExpr)');
+            this.addLog('DEBUG', 'PARSER -- Parsing Found LPAREN or BOOLEAN_VAL');
             // Handle specific expression type here...
         } else if (this.match(TokenType.DIGIT)) {
-            this.addLog('DEBUG', 'PARSER -- Parsing Found DIGIT (IntExpr)');
+            this.addLog('DEBUG', 'PARSER -- Parsing Found DIGIT');
             // Handle integer expression...
         } else if (this.match(TokenType.IDENTIFIER)) {
             this.addLog('DEBUG', 'PARSER -- Parsing Found ID');
@@ -738,7 +738,7 @@ export class Parser {
                 return null;
             }
         } else if (this.match(TokenType.QUOTE)) {
-            this.addLog('DEBUG', 'PARSER -- Parsing Found QUOTE (StringExpr)');
+            this.addLog('DEBUG', 'PARSER -- Parsing found QUOTE');
             // Handle string expression...
         } else {
             this.handleError(`Expected expression, got ${current.value}`, current);
