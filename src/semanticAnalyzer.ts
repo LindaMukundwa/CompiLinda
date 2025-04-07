@@ -42,90 +42,395 @@ export interface SymbolTableEntry {
     used: boolean;
 }
 
-// Semantic Analyzer class
+// Define error/warning types
+interface SemanticIssue {
+    type: 'error' | 'warning';
+    message: string;
+    line: number;
+    column: number;
+}
+
+/**
+ * Main Semantic Analyzer class
+ */
 export class SemanticAnalyzer {
-    private tokens: Token[];
-    private currentTokenIndex: number = 0;
+    // You would replace this with your actual CST type
+    private cst: any;
+    // Current scope level (increments with each block entry)
     private currentScope: number = 0;
+    // Stack of scope levels to handle nested scopes
     private scopeStack: number[] = [0];
+    // Symbol table: maps identifiers to their details across different scopes
     private symbolTable: Map<string, SymbolTableEntry[]> = new Map();
-    private errors: string[] = [];
-    private warnings: string[] = [];
+    // Track semantic errors
+    private issues: SemanticIssue[] = [];
     
-    constructor(tokens: Token[]) {
-        this.tokens = tokens;
+    /**
+     * Constructor takes the CST from your parser
+     */
+    constructor(cst: any) {
+        this.cst = cst;
     }
 
-    // Gets the current token
-    private currentToken(): Token {
-        return this.tokens[this.currentTokenIndex];
+    /**
+     * Main analysis method
+     * Returns analysis results including symbol table and issues
+     */
+    public analyze(): {
+        symbolTable: Map<string, SymbolTableEntry[]>;
+        issues: SemanticIssue[];
+    } {
+        // Start the recursive analysis from the root of the CST
+        this.analyzeNode(this.cst);
+        // Check for any remaining unused variables in global scope
+        this.checkForUnusedVariables(0);
+        return {
+            symbolTable: this.symbolTable,
+            issues: this.issues
+        };
     }
 
-    // Advances to the next token
-    private advance(): void {
-        this.currentTokenIndex++;
+    /**
+     * Print the analysis results in a readable format
+     */
+    public printResults(): void {
+        console.log("==== Symbol Table ====");
+        this.symbolTable.forEach((entries, name) => {
+            entries.forEach(entry => {
+                console.log(`${name} (${entry.type}) - Scope: ${entry.scope}, Line: ${entry.line}, Column: ${entry.column}`);
+                console.log(`  Initialized: ${entry.initialized}, Used: ${entry.used}`);
+            });
+        });
+
+        console.log("\n==== Semantic Issues ====");
+        this.issues.forEach(issue => {
+            console.log(`[${issue.type.toUpperCase()}] Line ${issue.line}, Column ${issue.column}: ${issue.message}`);
+        });
     }
 
-    // Checks if the current token is of a specific type
-    private match(type: TokenType): boolean {
-        return this.currentToken().type === type;
-    }
+    /**
+     * Analyze a CST node recursively
+     */
+    private analyzeNode(node: any): string | null {
+        // This is a simplified skeleton - you'll need to adapt this
+        // to match your specific CST structure
+        if (!node) return null;
 
-    // Consumes token if it matches the expected type
-    private consume(type: TokenType, errorMessage: string): Token {
-        if (this.match(type)) {
-            const token = this.currentToken();
-            this.advance();
-            return token;
+        // Different node types will need different analysis
+        switch (node.type) {
+            case 'Program':
+                return this.analyzeProgram(node);
+            case 'Block':
+                return this.analyzeBlock(node);
+            case 'VarDeclaration':
+                return this.analyzeVarDeclaration(node);
+            case 'AssignmentStatement':
+                return this.analyzeAssignment(node);
+            case 'IfStatement':
+                return this.analyzeIfStatement(node);
+            case 'WhileStatement':
+                return this.analyzeWhileStatement(node);
+            case 'PrintStatement':
+                return this.analyzePrintStatement(node);
+            case 'BinaryExpression':
+                return this.analyzeBinaryExpression(node);
+            case 'Identifier':
+                return this.analyzeIdentifier(node);
+            case 'IntLiteral':
+                return 'int';
+            case 'StringLiteral':
+                return 'string';
+            case 'BooleanLiteral':
+                return 'boolean';
+            default:
+                // For other node types or to handle children generically
+                if (node.children && Array.isArray(node.children)) {
+                    for (const child of node.children) {
+                        this.analyzeNode(child);
+                    }
+                }
+                return null;
         }
-        this.addError(errorMessage);
-        return this.currentToken(); // Return current token anyway
     }
 
-    // Adds error message
-    private addError(message: string): void {
-        const token = this.currentToken();
-        this.errors.push(`Error at ${token.line}:${token.column} - ${message}`);
+    /**
+     * Analyze program (root node)
+     */
+    private analyzeProgram(node: any): string | null {
+        // Process all children of the program node
+        if (node.children && Array.isArray(node.children)) {
+            for (const child of node.children) {
+                this.analyzeNode(child);
+            }
+        }
+        return null;
     }
 
-    // Adds warning message
-    private addWarning(message: string): void {
-        const token = this.currentToken();
-        this.warnings.push(`Warning at ${token.line}:${token.column} - ${message}`);
+    /**
+     * Analyze a code block
+     */
+    private analyzeBlock(node: any): string | null {
+        // Enter a new scope
+        this.enterScope();
+        
+        // Process all statements in the block
+        if (node.children && Array.isArray(node.children)) {
+            for (const child of node.children) {
+                this.analyzeNode(child);
+            }
+        }
+        
+        // Exit the scope when done with the block
+        this.exitScope();
+        return null;
     }
 
-    // Enters a new scope
+    /**
+     * Analyze variable declaration
+     */
+    private analyzeVarDeclaration(node: any): string | null {
+        const type = node.varType; // 'int', 'string', or 'boolean'
+        const name = node.varName;
+        const line = node.line;
+        const column = node.column;
+        
+        // Add to symbol table
+        this.addSymbol(name, type, line, column);
+        
+        // If there's an initializer, analyze it
+        if (node.initializer) {
+            const initType = this.analyzeNode(node.initializer);
+            
+            // Type checking
+            if (initType !== type) {
+                this.addError(
+                    `Type mismatch in initialization: Cannot assign ${initType} to ${type}`,
+                    line, column
+                );
+            }
+            
+            // Mark as initialized
+            this.markInitialized(name);
+        } else {
+            // Warning for uninitialized variable
+            this.addWarning(
+                `Variable '${name}' declared but not initialized`,
+                line, column
+            );
+        }
+        
+        return type;
+    }
+
+    /**
+     * Analyze assignment statement
+     */
+    private analyzeAssignment(node: any): string | null {
+        const name = node.identifier.value;
+        const line = node.line;
+        const column = node.column;
+        
+        // Check if variable exists
+        const symbol = this.getSymbol(name);
+        if (!symbol) {
+            this.addError(
+                `Assignment to undeclared variable '${name}'`,
+                line, column
+            );
+            return null;
+        }
+        
+        // Mark as initialized and used
+        this.markInitialized(name);
+        this.markUsed(name);
+        
+        // Type check the expression
+        const exprType = this.analyzeNode(node.expression);
+        if (exprType !== symbol.type) {
+            this.addError(
+                `Type mismatch in assignment: Cannot assign ${exprType} to ${symbol.type}`,
+                line, column
+            );
+        }
+        
+        return symbol.type;
+    }
+
+    /**
+     * Analyze if statement
+     */
+    private analyzeIfStatement(node: any): string | null {
+        // Check condition type
+        const conditionType = this.analyzeNode(node.condition);
+        if (conditionType !== 'boolean') {
+            this.addError(
+                `If condition must be boolean, got ${conditionType}`,
+                node.line, node.column
+            );
+        }
+        
+        // Analyze then-branch
+        this.analyzeNode(node.thenBranch);
+        
+        // Analyze else-branch if it exists
+        if (node.elseBranch) {
+            this.analyzeNode(node.elseBranch);
+        }
+        
+        return null;
+    }
+
+    /**
+     * Analyze while statement
+     */
+    private analyzeWhileStatement(node: any): string | null {
+        // Check condition type
+        const conditionType = this.analyzeNode(node.condition);
+        if (conditionType !== 'boolean') {
+            this.addError(
+                `While condition must be boolean, got ${conditionType}`,
+                node.line, node.column
+            );
+        }
+        
+        // Analyze body
+        this.analyzeNode(node.body);
+        
+        return null;
+    }
+
+    /**
+     * Analyze print statement
+     */
+    private analyzePrintStatement(node: any): string | null {
+        // Just analyze the expression to ensure it's valid
+        this.analyzeNode(node.expression);
+        return null;
+    }
+
+    /**
+     * Analyze binary expression
+     */
+    private analyzeBinaryExpression(node: any): string | null {
+        const leftType = this.analyzeNode(node.left);
+        const rightType = this.analyzeNode(node.right);
+        const operator = node.operator;
+        
+        // Type checking based on operator
+        switch (operator) {
+            case '+':
+                // Addition works only on int
+                if (leftType !== 'int' || rightType !== 'int') {
+                    this.addError(
+                        `Operator '+' can only be applied to integers`,
+                        node.line, node.column
+                    );
+                    return 'int'; // Assume int for error recovery
+                }
+                return 'int';
+                
+            case '==':
+            case '!=':
+                // Equality operators require same types
+                if (leftType !== rightType) {
+                    this.addError(
+                        `Cannot compare ${leftType} with ${rightType}`,
+                        node.line, node.column
+                    );
+                }
+                return 'boolean';
+                
+            // Add other operators as needed
+            
+            default:
+                this.addError(
+                    `Unknown operator: ${operator}`,
+                    node.line, node.column
+                );
+                return null;
+        }
+    }
+
+    /**
+     * Analyze identifier reference
+     */
+    private analyzeIdentifier(node: any): string | null {
+        const name = node.value;
+        
+        // Look up the symbol
+        const symbol = this.getSymbol(name);
+        if (!symbol) {
+            this.addError(
+                `Undefined variable '${name}'`,
+                node.line, node.column
+            );
+            return null;
+        }
+        
+        // Mark as used
+        this.markUsed(name);
+        
+        // Check if it's initialized
+        if (!symbol.initialized) {
+            this.addWarning(
+                `Using uninitialized variable '${name}'`,
+                node.line, node.column
+            );
+        }
+        
+        return symbol.type;
+    }
+
+    // ===== Scope Management Methods =====
+
+    /**
+     * Enter a new scope
+     */
     private enterScope(): void {
         this.currentScope++;
         this.scopeStack.push(this.currentScope);
     }
 
-    // Exits the current scope
+    /**
+     * Exit the current scope
+     */
     private exitScope(): void {
+        // Check for unused variables in the scope we're exiting
+        this.checkForUnusedVariables(this.currentScope);
+        
         this.scopeStack.pop();
         this.currentScope = this.scopeStack[this.scopeStack.length - 1];
-        
-        // Check for unused variables in the exited scope
-        this.checkUnusedVariables();
     }
 
-    // Check for unused variables in the current scope
-    private checkUnusedVariables(): void {
-        for (const [name, entries] of this.symbolTable.entries()) {
-            for (const entry of entries) {
-                if (entry.scope === this.currentScope + 1) {
+    /**
+     * Check for unused variables in a specific scope
+     */
+    private checkForUnusedVariables(scope: number): void {
+        this.symbolTable.forEach((entries, name) => {
+            entries.forEach(entry => {
+                if (entry.scope === scope) {
                     if (!entry.used) {
-                        this.warnings.push(`Warning at ${entry.line}:${entry.column} - Variable '${entry.name}' declared but never used`);
+                        this.addWarning(
+                            `Variable '${name}' declared but never used`,
+                            entry.line, entry.column
+                        );
                     }
                     if (entry.initialized && !entry.used) {
-                        this.warnings.push(`Warning at ${entry.line}:${entry.column} - Variable '${entry.name}' initialized but never used`);
+                        this.addWarning(
+                            `Variable '${name}' initialized but never used`,
+                            entry.line, entry.column
+                        );
                     }
                 }
-            }
-        }
+            });
+        });
     }
 
-    // Adds symbol to the symbol table
+    // ===== Symbol Table Methods =====
+
+    /**
+     * Add a symbol to the symbol table
+     */
     private addSymbol(name: string, type: string, line: number, column: number): void {
         const entry: SymbolTableEntry = {
             name,
@@ -136,40 +441,51 @@ export class SemanticAnalyzer {
             initialized: false,
             used: false
         };
-
-        // Checks if symbol already exists in current scope
+        
+        // Check for redeclaration in the same scope
         const existingEntries = this.symbolTable.get(name) || [];
         for (const existing of existingEntries) {
             if (existing.scope === this.currentScope) {
-                this.addError(`Redeclaration of variable '${name}'`);
+                this.addError(
+                    `Redeclaration of '${name}' in the same scope`,
+                    line, column
+                );
                 return;
             }
         }
-
+        
+        // Add the new entry
         existingEntries.push(entry);
         this.symbolTable.set(name, existingEntries);
     }
 
-    // Get symbol from the symbol table
+    /**
+     * Get a symbol from the symbol table
+     * Returns the closest scoped variable visible from current scope
+     */
     private getSymbol(name: string): SymbolTableEntry | null {
         const entries = this.symbolTable.get(name);
         if (!entries || entries.length === 0) {
             return null;
         }
-
-        // Find the entry with the closest scope that is still valid
+        
+        // Find the entry in the most immediate enclosing scope
         for (let i = this.scopeStack.length - 1; i >= 0; i--) {
-            const scope = this.scopeStack[i];
+            const currentScope = this.scopeStack[i];
+            
             for (const entry of entries) {
-                if (entry.scope <= scope) {
+                if (entry.scope <= currentScope) {
                     return entry;
                 }
             }
         }
+        
         return null;
     }
 
-    // Marks a symbol as initialized
+    /**
+     * Mark a symbol as initialized
+     */
     private markInitialized(name: string): void {
         const symbol = this.getSymbol(name);
         if (symbol) {
@@ -177,14 +493,39 @@ export class SemanticAnalyzer {
         }
     }
 
-    // Marks a symbol as used
+    /**
+     * Mark a symbol as used
+     */
     private markUsed(name: string): void {
         const symbol = this.getSymbol(name);
         if (symbol) {
             symbol.used = true;
-        } else {
-            this.addError(`Use of undeclared variable '${name}'`);
         }
     }
 
+    // ===== Error Handling Methods =====
+
+  /*  
+     * Add an error to the issues list
+     */
+    private addError(message: string, line: number, column: number): void {
+        this.issues.push({
+            type: 'error',
+            message,
+            line,
+            column
+        });
+    }
+
+    /**
+     * Add a warning to the issues list
+     */
+    private addWarning(message: string, line: number, column: number): void {
+        this.issues.push({
+            type: 'warning',
+            message,
+            line,
+            column
+        });
+    } 
 }
