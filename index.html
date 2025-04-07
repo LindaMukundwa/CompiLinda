@@ -30,6 +30,8 @@
     </script>
     <!-- Then load parser.js -->
     <script src="./dist/parser.js"></script>
+    <!-- Then load semanticAanlyzer.js -->
+    <script src="./dist/semanticAnalyzer.js"></script>
 </head>
 
 <body>
@@ -44,6 +46,7 @@
         <div class="tab-container">
             <div class="tab active" onclick="showTab('lexer')">Lexer Output</div>
             <div class="tab" onclick="showTab('parser')">Parser Output</div>
+            <div class="tab" onclick="showTab('semanticAnalyzer')">Semantic Analyzer</div>
         </div>
 
         <div id="lexerTab" class="tab-content active">
