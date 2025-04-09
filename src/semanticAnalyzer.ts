@@ -78,10 +78,11 @@ export class SemanticAnalyzer {
      */
     constructor(cst: any) {
         this.cst = cst;
+        this.ast = cst;
         // Convert CST to AST using the adapter
-        this.ast = ASTAdapter.convert(cst);
+        //this.ast = ASTAdapter.convert(cst);
     }
-    
+
     /**
      * Main analysis method
      * Returns analysis results including symbol table and issues
