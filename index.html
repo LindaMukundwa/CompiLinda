@@ -32,6 +32,8 @@
     <script src="./dist/parser.js"></script>
     <!-- Then load semanticAanlyzer.js -->
     <script src="./dist/semanticAnalyzer.js"></script>
+    <!-- Then load semanticAanlyzer.js -->
+    <script src="./dist/semanticAnalyzer.js"></script>
 </head>
 
 <body>
@@ -57,6 +59,20 @@
             <div id="parseStatus"></div>
             <div id="cstDisplay" class="cst-container"></div>
         </div>
+        <!-- Add semantic analyzer tab content -->
+        <div id="semanticAnalyzerTab" class="tab-content">
+            <div id="semanticStatus"></div>
+            <div class="semantic-sections">
+                <div class="semantic-section">
+                    <h3>Symbol Table</h3>
+                    <pre id="symbolTableOutput"></pre>
+                </div>
+                <div class="semantic-section">
+                    <h3>Semantic Issues</h3>
+                    <pre id="semanticIssuesOutput"></pre>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>
@@ -74,9 +90,16 @@
                 document.getElementById('errorMessage').style.display = 'block';
                 return false;
             }
+            if (typeof SemanticAnalyzer === 'undefined') {
+                document.getElementById('errorMessage').textContent =
+                    'Error: SemanticAnalyzer not found. Ensure compilation was successful.';
+                document.getElementById('errorMessage').style.display = 'block';
+                return false;
+            }
             return true;
         }
 
+        // Show the selected tab
         // Show the selected tab
         function showTab(tabName) {
             // Hide all tabs
@@ -96,11 +119,15 @@
             } else if (tabName === 'parser') {
                 document.getElementById('parserTab').classList.add('active');
                 document.querySelector('.tab:nth-child(2)').classList.add('active');
+            } else if (tabName === 'semanticAnalyzer') {
+                document.getElementById('semanticAnalyzerTab').classList.add('active');
+                document.querySelector('.tab:nth-child(3)').classList.add('active');
             }
         }
 
         // Complete compilation function that performs lexing and parsing
         // updated compile function to not check for lexical errors since parsing handles that problem
+        // Complete compilation function that performs lexing, parsing and semantic analysis
         function compile() {
             if (!checkDependencies()) return;
 
@@ -109,6 +136,9 @@
             const parseStatusDiv = document.getElementById('parseStatus');
             const cstDisplayDiv = document.getElementById('cstDisplay');
             const errorDiv = document.getElementById('errorMessage');
+            const semanticStatusDiv = document.getElementById('semanticStatus');
+            const symbolTableOutput = document.getElementById('symbolTableOutput');
+            const semanticIssuesOutput = document.getElementById('semanticIssuesOutput');
 
             try {
                 // First, run the lexer
@@ -119,6 +149,9 @@
                 lexerOutputDiv.innerHTML = '';
                 parseStatusDiv.innerHTML = '';
                 cstDisplayDiv.innerHTML = '';
+                semanticStatusDiv.innerHTML = '';
+                symbolTableOutput.innerHTML = '';
+                semanticIssuesOutput.innerHTML = '';
 
                 // Display lexer logs
                 lexResult.logs.forEach(log => {
@@ -153,19 +186,32 @@
 
                     if (!hasParseErrors) {
                         parseStatusDiv.innerHTML += '<div class="parse-success">Parsing successful! Concrete Syntax Tree created.</div>';
+
+                        // Run semantic analyzer if parsing was successful
+                        const semanticAnalyzer = new SemanticAnalyzer(parseResult.ast);
+                        const semanticResult = semanticAnalyzer.analyze();
+
+                        // Display semantic analysis results
+                        semanticStatusDiv.innerHTML = '<div class="semantic-success">Semantic analysis completed!</div>';
+
+                        // Display symbol table
+                        symbolTableOutput.textContent = semanticAnalyzer.printResults();
+
+                        // Show semantic analyzer tab
+                        showTab('semanticAnalyzer');
                     }
                 } else {
                     cstDisplayDiv.textContent = 'No parse tree available.';
                 }
-
-                // Show parser tab
-                showTab('parser');
             } catch (error) {
                 errorDiv.textContent = error.message;
                 errorDiv.style.display = 'block';
                 lexerOutputDiv.innerHTML = '';
                 parseStatusDiv.innerHTML = '';
                 cstDisplayDiv.innerHTML = '';
+                semanticStatusDiv.innerHTML = '';
+                symbolTableOutput.innerHTML = '';
+                semanticIssuesOutput.innerHTML = '';
             }
         }
     </script>
