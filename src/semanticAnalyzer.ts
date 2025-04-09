@@ -4,7 +4,9 @@
 
 
 // import the tokens from the lexer to generate AST
-import { Token, TokenType } from './main'; 
+import { ASTNode as CSTNode } from './parser';
+import { ASTAdapter } from './astAdapter';
+import { Token, TokenType } from './main';
 
 // AST Node Types
 export enum NodeType {
@@ -51,6 +53,8 @@ interface SemanticIssue {
 }
 
 /**
+
+/**
  * Main Semantic Analyzer class
  */
 export class SemanticAnalyzer {
@@ -64,14 +68,20 @@ export class SemanticAnalyzer {
     private symbolTable: Map<string, SymbolTableEntry[]> = new Map();
     // Track semantic errors
     private issues: SemanticIssue[] = [];
+    private ast: ASTNode | null = null;
     
+    /**
+     * Constructor takes the CST from your parser
+     */
     /**
      * Constructor takes the CST from your parser
      */
     constructor(cst: any) {
         this.cst = cst;
+        // Convert CST to AST using the adapter
+        this.ast = ASTAdapter.convert(cst);
     }
-
+    
     /**
      * Main analysis method
      * Returns analysis results including symbol table and issues
@@ -79,68 +89,81 @@ export class SemanticAnalyzer {
     public analyze(): {
         symbolTable: Map<string, SymbolTableEntry[]>;
         issues: SemanticIssue[];
+        ast: ASTNode | null;
     } {
-        // Start the recursive analysis from the root of the CST
-        this.analyzeNode(this.cst);
+        if (!this.ast) {
+            this.addError("Failed to generate AST from parser output", 0, 0);
+            return {
+                symbolTable: this.symbolTable,
+                issues: this.issues,
+                ast: null
+            };
+        }
+        
+        // Start the recursive analysis from the root of the AST
+        this.analyzeNode(this.ast);
+        
         // Check for any remaining unused variables in global scope
         this.checkForUnusedVariables(0);
+        
         return {
             symbolTable: this.symbolTable,
-            issues: this.issues
+            issues: this.issues,
+            ast: this.ast
         };
     }
 
     /**
      * Print the analysis results in a readable format
      */
-    public printResults(): void {
-        console.log("==== Symbol Table ====");
+    public printResults(): string {
+        let output = "==== Symbol Table ====\n";
         this.symbolTable.forEach((entries, name) => {
             entries.forEach(entry => {
-                console.log(`${name} (${entry.type}) - Scope: ${entry.scope}, Line: ${entry.line}, Column: ${entry.column}`);
-                console.log(`  Initialized: ${entry.initialized}, Used: ${entry.used}`);
+                output += `${name} (${entry.type}) - Scope: ${entry.scope}, Line: ${entry.line}, Column: ${entry.column}\n`;
+                output += `  Initialized: ${entry.initialized}, Used: ${entry.used}\n`;
             });
         });
 
-        console.log("\n==== Semantic Issues ====");
+        output += "\n==== Semantic Issues ====\n";
         this.issues.forEach(issue => {
-            console.log(`[${issue.type.toUpperCase()}] Line ${issue.line}, Column ${issue.column}: ${issue.message}`);
+            output += `[${issue.type.toUpperCase()}] Line ${issue.line}, Column ${issue.column}: ${issue.message}\n`;
         });
+        
+        return output;
     }
 
     /**
      * Analyze a CST node recursively
      */
-    private analyzeNode(node: any): string | null {
-        // This is a simplified skeleton - you'll need to adapt this
-        // to match your specific CST structure
+    private analyzeNode(node: ASTNode): string | null {
         if (!node) return null;
 
         // Different node types will need different analysis
         switch (node.type) {
-            case 'Program':
+            case NodeType.Program:
                 return this.analyzeProgram(node);
-            case 'Block':
+            case NodeType.Block:
                 return this.analyzeBlock(node);
-            case 'VarDeclaration':
+            case NodeType.VarDeclaration:
                 return this.analyzeVarDeclaration(node);
-            case 'AssignmentStatement':
+            case NodeType.AssignmentStatement:
                 return this.analyzeAssignment(node);
-            case 'IfStatement':
+            case NodeType.IfStatement:
                 return this.analyzeIfStatement(node);
-            case 'WhileStatement':
+            case NodeType.WhileStatement:
                 return this.analyzeWhileStatement(node);
-            case 'PrintStatement':
+            case NodeType.PrintStatement:
                 return this.analyzePrintStatement(node);
-            case 'BinaryExpression':
+            case NodeType.BinaryExpression:
                 return this.analyzeBinaryExpression(node);
-            case 'Identifier':
+            case NodeType.Identifier:
                 return this.analyzeIdentifier(node);
-            case 'IntLiteral':
+            case NodeType.IntegerLiteral:
                 return 'int';
-            case 'StringLiteral':
+            case NodeType.StringLiteral:
                 return 'string';
-            case 'BooleanLiteral':
+            case NodeType.BooleanLiteral:
                 return 'boolean';
             default:
                 // For other node types or to handle children generically
