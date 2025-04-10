@@ -6,6 +6,8 @@ import { ASTNode as CSTNode } from './parser';
 import { ASTNode, NodeType } from './semanticAnalyzer';
 
 export class ASTAdapter {
+
+
   /**
    * Convert the CST from the Parser to the AST format expected by SemanticAnalyzer
    */
