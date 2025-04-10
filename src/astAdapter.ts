@@ -120,11 +120,10 @@ export class ASTAdapter {
      */
     private static convertBlock(cstNode: CSTNode, line: number, column: number): ASTNode {
         const children: ASTNode[] = [];
-
-        // Process all children that could be statements
+        
+        // Process statements if they exist
         for (const child of cstNode.children) {
             if (child.name === 'StatementList') {
-                // Process each statement in the list
                 for (const statement of child.children) {
                     const statementNode = this.convertNode(statement);
                     if (statementNode) {
@@ -132,15 +131,9 @@ export class ASTAdapter {
                     }
                 }
             }
-            // Also handle direct statements if they exist
-            else if (this.isStatementNode(child)) {
-                const statementNode = this.convertNode(child);
-                if (statementNode) {
-                    children.push(statementNode);
-                }
-            }
         }
-
+        
+        // Return Block node even if empty
         return {
             type: NodeType.Block,
             line,
@@ -431,3 +424,12 @@ export class ASTAdapter {
         };
     }
 }
+
+// Export for browser
+declare global {
+    interface Window {
+        astAdapter: typeof ASTAdapter;
+    }
+}
+
+(window as any).astAdapter = ASTAdapter;

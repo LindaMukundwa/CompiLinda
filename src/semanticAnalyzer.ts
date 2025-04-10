@@ -6,7 +6,7 @@
 // import the tokens from the lexer to generate AST
 import { ASTNode as CSTNode } from './parser';
 import { ASTAdapter } from './astAdapter';
-import { Token, TokenType } from './main';
+import { LexerLog, Token, TokenType } from './main';
 
 // AST Node Types
 export enum NodeType {
@@ -50,6 +50,7 @@ interface SemanticIssue {
     message: string;
     line: number;
     column: number;
+    
 }
 
 /**
@@ -58,7 +59,7 @@ interface SemanticIssue {
  * Main Semantic Analyzer class
  */
 export class SemanticAnalyzer {
-    // You would replace this with your actual CST type
+    // replace this with CST type
     private cst: any;
     // Current scope level (increments with each block entry)
     private currentScope: number = 0;
@@ -69,6 +70,16 @@ export class SemanticAnalyzer {
     // Track semantic errors
     private issues: SemanticIssue[] = [];
     private ast: ASTNode | null = null;
+
+    private programCounter: number = 1;
+    private lexerLogs: LexerLog[] = []; // Store lexer logs separately
+
+   /*  constructor(tokens: Token[], lexerLogs: LexerLog[] = []) {
+        this.tokens = tokens;
+        this.lexerLogs = lexerLogs; // Store the lexer logs
+        this.logs = [...lexerLogs]; // Include lexer logs in our logs
+        this.addLog('INFO', `PARSER -- Parsing program ${this.programCounter}...`);
+    } */
     
     /**
      * Constructor takes the CST from your parser
@@ -78,10 +89,19 @@ export class SemanticAnalyzer {
      */
     constructor(cst: any) {
         this.cst = cst;
-        this.ast = cst;
+        //this.ast = cst;
         // Convert CST to AST using the adapter
-        //this.ast = ASTAdapter.convert(cst);
+        this.ast = ASTAdapter.convert(cst);
+        //this.addLog('INFO', `SEMANTIC ANALYZER -- Analyzing program ${this.programCounter}...`);
     }
+
+     /* // Adding log
+     private addLog(level: 'INFO' | 'DEBUG' | 'ERROR' | 'WARNING', message: string): void {
+        this.logs.push({ // need to change error messaging 
+            level,
+            message
+        });
+    } */
 
     /**
      * Main analysis method
@@ -118,21 +138,68 @@ export class SemanticAnalyzer {
      * Print the analysis results in a readable format
      */
     public printResults(): string {
-        let output = "==== Symbol Table ====\n";
+        let output = `Program 1 Abstract Syntax Tree\n`;
+        output += '---------------------------------------------------\n';
+        output += this.printAST(this.ast);
+        output += '\n';
+    
+        output += `Program 1 Symbol Table\n`;
+        output += '---------------------------------------------------\n';
+        output += 'NAME\tTYPE\tisINIT?\tisUSED?\tSCOPE\n';
+        output += '---------------------------------------------------\n';
+        
+        // Add symbol table entries
         this.symbolTable.forEach((entries, name) => {
             entries.forEach(entry => {
-                output += `${name} (${entry.type}) - Scope: ${entry.scope}, Line: ${entry.line}, Column: ${entry.column}\n`;
-                output += `  Initialized: ${entry.initialized}, Used: ${entry.used}\n`;
+                output += `${name}\t${entry.type}\t${entry.initialized}\t${entry.used}\t${entry.scope}\n`;
             });
         });
-
-        output += "\n==== Semantic Issues ====\n";
-        this.issues.forEach(issue => {
-            output += `[${issue.type.toUpperCase()}] Line ${issue.line}, Column ${issue.column}: ${issue.message}\n`;
-        });
+    
+        output += '\nSEMANTIC ANALYZER --> ';
+        if (this.issues.some(issue => issue.type === 'error')) {
+            output += 'Semantic Analysis completed with errors\n';
+        } else {
+            output += 'Semantic Analysis completed successfully\n';
+        }
         
         return output;
     }
+
+    /**
+ * Print the AST in a readable format
+ */
+private printAST(node: ASTNode | null, indent: string = ''): string {
+    if (!node) return '';
+    
+    let output = '';
+    switch (node.type) {
+        case NodeType.Program:
+            output += `${indent}<Program>\n`;
+            if (node.children) {
+                for (const child of node.children) {
+                    output += this.printAST(child, indent + '  ');
+                }
+            }
+            break;
+        case NodeType.Block:
+            output += `${indent}<Block>\n`;
+            if (node.children) {
+                for (const child of node.children) {
+                    output += this.printAST(child, indent + '  ');
+                }
+            }
+            break;
+        // Add cases for other node types as needed
+        default:
+            output += `${indent}<${NodeType[node.type]}>\n`;
+            if (node.children) {
+                for (const child of node.children) {
+                    output += this.printAST(child, indent + '  ');
+                }
+            }
+    }
+    return output;
+}
 
     /**
      * Analyze a CST node recursively
@@ -553,3 +620,12 @@ export class SemanticAnalyzer {
         });
     } 
 }
+
+// Export for browser
+declare global {
+    interface Window {
+        SemanticAnalyzer: typeof SemanticAnalyzer;
+    }
+}
+
+(window as any).SemanticAnalyzer = SemanticAnalyzer;
