@@ -425,11 +425,22 @@ export class ASTAdapter {
     }
 }
 
-// Export for browser
+// Type declaration for global scope
 declare global {
     interface Window {
-        astAdapter: typeof ASTAdapter;
+        ASTAdapter: typeof ASTAdapter;
     }
 }
 
-(window as any).astAdapter = ASTAdapter;
+// Export for both module and browser environments
+const exportAdapter = {
+    ASTAdapter
+};
+
+// For browser environment
+if (typeof window !== 'undefined') {
+    window.ASTAdapter = ASTAdapter;
+}
+
+// For module systems
+export default exportAdapter;

@@ -31,13 +31,12 @@
     <!-- Load AST adapter next -->
     <script src="./dist/astAdapter.js"></script>
     <script>
-        console.log("AST Adapter loaded:", typeof ASTAdapter); // or whatever your global name is
-        console.log("Has convert method:", ASTAdapter && ASTAdapter.convert);
-    </script>
-    <script>
-        // Store AST adapter exports if needed
-        window.astAdapterExports = exports;
-        exports = {};
+        // Verify it loaded correctly
+        if (typeof ASTAdapter === 'undefined') {
+            console.error('ASTAdapter failed to load! Check the compiled output.');
+        } else {
+            console.log('ASTAdapter loaded successfully:', ASTAdapter);
+        }
     </script>
     <!-- Then load parser.js -->
     <script src="./dist/parser.js"></script>
@@ -100,9 +99,9 @@
         async function loadTestCase() {
             const select = document.getElementById('testCases');
             const filename = select.value;
-            
+
             if (!filename) return;
-            
+
             try {
                 const response = await fetch(`testCases/${filename}`);
                 if (!response.ok) {
@@ -181,6 +180,17 @@
         // updated compile function to not check for lexical errors since parsing handles that problem
         // Complete compilation function that performs lexing, parsing and semantic analysis
         function compile() {
+            // check AST adapter first 
+            if (typeof ASTAdapter === 'undefined' || !ASTAdapter.convert) {
+                document.getElementById('errorMessage').textContent =
+                    'Error: ASTAdapter not properly initialized. Check console for details.';
+                document.getElementById('errorMessage').style.display = 'block';
+                console.error('ASTAdapter state:', {
+                    exists: typeof ASTAdapter !== 'undefined',
+                    convert: ASTAdapter ? typeof ASTAdapter.convert : 'none'
+                });
+                return;
+            }
             if (!checkDependencies()) return;
 
             const sourceCode = document.getElementById('sourceCode').value;
