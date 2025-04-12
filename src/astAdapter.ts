@@ -11,7 +11,7 @@ export class ASTAdapter {
     /**
      * Convert the CST from the Parser to the AST format expected by SemanticAnalyzer
      */
-    public static convert(cstRoot: CSTNode): ASTNode | null {
+    /* public static convert(cstRoot: CSTNode): ASTNode | null {
         //if (!cstRoot) return null;
         if (!cstRoot || !cstRoot.name) {
             // Return a minimal valid program node for empty input
@@ -24,6 +24,11 @@ export class ASTAdapter {
         }
 
         // Start conversion at the root
+        return this.convertNode(cstRoot);
+    } */
+
+    public static convert(cstRoot: CSTNode): ASTNode | null {
+        if (!cstRoot) return null;
         return this.convertNode(cstRoot);
     }
 
@@ -92,8 +97,7 @@ export class ASTAdapter {
                 };
             default:
                 // Try to process children for unknown node types
-                if (cstNode.children && cstNode.children.length > 0) {
-                    // For nodes that just pass through to children
+                if (cstNode.children?.length) {
                     return this.convertNode(cstNode.children[0]);
                 }
                 return null;
@@ -212,38 +216,29 @@ export class ASTAdapter {
      * Convert a VariableDeclaration node
      */
     private static convertVarDeclaration(cstNode: CSTNode, line: number, column: number): ASTNode {
-        let type = "";
-        let name = "";
-
-        // Extract the type
-        const typeNode = cstNode.children.find(child => child.name === 'Type');
-        if (typeNode && typeNode.children.length > 0) {
-            const typeChild = typeNode.children[0];
-            if (typeChild.name === 'IntType') {
-                type = "int";
-            } else if (typeChild.name === 'StringType') {
-                type = "string";
-            } else if (typeChild.name === 'BooleanType') {
-                type = "boolean";
-            }
-        }
-
-        // Extract the identifier name
-        const identNode = cstNode.children.find(child => child.name === 'Identifier');
-        if (identNode && identNode.token) {
-            name = identNode.token.value;
-        }
-
+        const typeNode = cstNode.children.find(c => c.name === 'Type');
+        const identNode = cstNode.children.find(c => c.name === 'Identifier');
+        
         return {
             type: NodeType.VarDeclaration,
             line,
             column,
-            varName: name,
-            varType: type,
-            initializer: null // No initializer in your grammar
+            varName: identNode?.token?.value || '',
+            varType: this.getTypeFromNode(typeNode),
+            initializer: null // Will be set during semantic analysis
         };
     }
 
+    private static getTypeFromNode(typeNode: CSTNode | undefined): string {
+        if (!typeNode) return 'unknown';
+        const typeChild = typeNode.children[0];
+        switch (typeChild?.name) {
+            case 'IntType': return 'int';
+            case 'StringType': return 'string';
+            case 'BooleanType': return 'boolean';
+            default: return 'unknown';
+        }
+    }
     /**
      * Convert an AssignmentStatement node
      */

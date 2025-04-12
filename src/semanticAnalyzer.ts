@@ -106,16 +106,15 @@ export class SemanticAnalyzer {
         constructor(cst: any) {
             this.cst = cst;
             
-            // Debugging: Log the CST structure
-            console.log("Parser output CST:", JSON.stringify(cst, null, 2));
-            
-            try {
-                this.ast = ASTAdapter.convert(cst);
-                console.log("Converted AST:", JSON.stringify(this.ast, null, 2));
-            } catch (error) {
-                console.error("AST Conversion failed:", error);
-                throw error;
+            // Debug check
+            if (typeof ASTAdapter === 'undefined') {
+                throw new Error("ASTAdapter is not available in global scope");
             }
+            if (typeof ASTAdapter.convert !== 'function') {
+                throw new Error("ASTAdapter.convert is not a function");
+            }
+            
+            this.ast = ASTAdapter.convert(cst);
         }
 
     /**

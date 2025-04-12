@@ -23,24 +23,22 @@
     <!-- Load main.js first and store its exports -->
     <script src="./dist/main.js"></script>
     <script>
-        // Store main.js exports for later use
         window.mainExports = exports;
-        // Reset exports for parser.js
         exports = {};
     </script>
-    <!-- Load AST adapter next -->
+
+    <!-- Load AST adapter next - MUST come before parser/semantic analyzer -->
     <script src="./dist/astAdapter.js"></script>
     <script>
-        // Verify it loaded correctly
-        if (typeof ASTAdapter === 'undefined') {
-            console.error('ASTAdapter failed to load! Check the compiled output.');
-        } else {
-            console.log('ASTAdapter loaded successfully:', ASTAdapter);
+        // Forcefully expose to window if needed
+        if (typeof ASTAdapter === 'undefined' && typeof window.astAdapter !== 'undefined') {
+            window.ASTAdapter = window.astAdapter;
         }
+        console.log('ASTAdapter available:', typeof ASTAdapter !== 'undefined');
     </script>
-    <!-- Then load parser.js -->
+
+    <!-- Then load other files -->
     <script src="./dist/parser.js"></script>
-    <!-- Then load semanticAanlyzer.js -->
     <script src="./dist/semanticAnalyzer.js"></script>
 </head>
 
@@ -181,14 +179,18 @@
         // Complete compilation function that performs lexing, parsing and semantic analysis
         function compile() {
             // check AST adapter first 
-            if (typeof ASTAdapter === 'undefined' || !ASTAdapter.convert) {
-                document.getElementById('errorMessage').textContent =
-                    'Error: ASTAdapter not properly initialized. Check console for details.';
-                document.getElementById('errorMessage').style.display = 'block';
-                console.error('ASTAdapter state:', {
-                    exists: typeof ASTAdapter !== 'undefined',
-                    convert: ASTAdapter ? typeof ASTAdapter.convert : 'none'
-                });
+            try {
+                if (typeof ASTAdapter === 'undefined') {
+                    throw new Error("ASTAdapter not loaded - check console for errors");
+                }
+                if (typeof ASTAdapter.convert !== 'function') {
+                    throw new Error("ASTAdapter.convert is not a function - check adapter implementation");
+                }
+            } catch (error) {
+                const errorDiv = document.getElementById('errorMessage');
+                errorDiv.textContent = `Initialization Error: ${error.message}`;
+                errorDiv.style.display = 'block';
+                console.error("ASTAdapter check failed:", error);
                 return;
             }
             if (!checkDependencies()) return;
@@ -269,7 +271,7 @@
                 //console.log("Parser output:", parseResult);
                 //console.log("AST to convert:", parseResult.ast);
                 //if (!parseResult.ast) {
-                  //  throw new Error("Parser returned no AST to convert");
+                //  throw new Error("Parser returned no AST to convert");
                 //}
             } catch (error) {
                 errorDiv.textContent = error.message;
