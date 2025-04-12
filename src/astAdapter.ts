@@ -12,7 +12,16 @@ export class ASTAdapter {
      * Convert the CST from the Parser to the AST format expected by SemanticAnalyzer
      */
     public static convert(cstRoot: CSTNode): ASTNode | null {
-        if (!cstRoot) return null;
+        //if (!cstRoot) return null;
+        if (!cstRoot || !cstRoot.name) {
+            // Return a minimal valid program node for empty input
+            return {
+                type: NodeType.Program,
+                line: 0,
+                column: 0,
+                children: []
+            };
+        }
 
         // Start conversion at the root
         return this.convertNode(cstRoot);
@@ -51,6 +60,28 @@ export class ASTAdapter {
                 return this.convertExpression(cstNode, line, column);
             case 'StringExpression':
                 return this.convertStringExpression(cstNode, line, column);
+            case 'StatementList':
+                // Handle empty statement lists
+                if (!cstNode.children || cstNode.children.length === 0) {
+                    return {
+                        type: NodeType.Block,
+                        line,
+                        column,
+                        children: []
+                    };
+                }
+                // Convert all statements in the list
+                const statements: ASTNode[] = [];
+                for (const child of cstNode.children) {
+                    const converted = this.convertNode(child);
+                    if (converted) statements.push(converted);
+                }
+                return {
+                    type: NodeType.Block,
+                    line,
+                    column,
+                    children: statements
+                };
             case 'Identifier':
                 return {
                     type: NodeType.Identifier,
@@ -119,21 +150,18 @@ export class ASTAdapter {
      * Convert a Block node
      */
     private static convertBlock(cstNode: CSTNode, line: number, column: number): ASTNode {
-        const children: ASTNode[] = [];
+        // Find the StatementList child if it exists
+        const statementList = cstNode.children.find(child => child.name === 'StatementList');
         
-        // Process statements if they exist
-        for (const child of cstNode.children) {
-            if (child.name === 'StatementList') {
-                for (const statement of child.children) {
-                    const statementNode = this.convertNode(statement);
-                    if (statementNode) {
-                        children.push(statementNode);
-                    }
-                }
+        let children: ASTNode[] = [];
+        if (statementList) {
+            // Convert all statements in the list
+            for (const statement of statementList.children) {
+                const converted = this.convertNode(statement);
+                if (converted) children.push(converted);
             }
         }
         
-        // Return Block node even if empty
         return {
             type: NodeType.Block,
             line,

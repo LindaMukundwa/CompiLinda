@@ -265,6 +265,12 @@
                 } else {
                     cstDisplayDiv.textContent = 'No parse tree available.';
                 }
+
+                //console.log("Parser output:", parseResult);
+                //console.log("AST to convert:", parseResult.ast);
+                //if (!parseResult.ast) {
+                  //  throw new Error("Parser returned no AST to convert");
+                //}
             } catch (error) {
                 errorDiv.textContent = error.message;
                 errorDiv.style.display = 'block';

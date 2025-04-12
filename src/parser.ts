@@ -320,6 +320,10 @@ export class Parser {
         }
 
         this.addLog('DEBUG', 'PARSER -- Parsing Block parsed successfully');
+        if (!blockNode.children.some(child => child.name === 'StatementList')) {
+            this.addChild(blockNode, this.createNode('StatementList'));
+        }
+        
         return blockNode;
     }
 

@@ -87,13 +87,13 @@ export class SemanticAnalyzer {
     /**
      * Constructor takes the CST from your parser
      */
-    constructor(cst: any) {
+   /*  constructor(cst: any) {
         this.cst = cst;
         //this.ast = cst;
         // Convert CST to AST using the adapter
         this.ast = ASTAdapter.convert(cst);
         //this.addLog('INFO', `SEMANTIC ANALYZER -- Analyzing program ${this.programCounter}...`);
-    }
+    } */
 
      /* // Adding log
      private addLog(level: 'INFO' | 'DEBUG' | 'ERROR' | 'WARNING', message: string): void {
@@ -102,6 +102,21 @@ export class SemanticAnalyzer {
             message
         });
     } */
+
+        constructor(cst: any) {
+            this.cst = cst;
+            
+            // Debugging: Log the CST structure
+            console.log("Parser output CST:", JSON.stringify(cst, null, 2));
+            
+            try {
+                this.ast = ASTAdapter.convert(cst);
+                console.log("Converted AST:", JSON.stringify(this.ast, null, 2));
+            } catch (error) {
+                console.error("AST Conversion failed:", error);
+                throw error;
+            }
+        }
 
     /**
      * Main analysis method
