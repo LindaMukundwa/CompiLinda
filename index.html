@@ -28,10 +28,19 @@
         // Reset exports for parser.js
         exports = {};
     </script>
+    <!-- Load AST adapter next -->
+    <script src="./dist/astAdapter.js"></script>
+    <script>
+        console.log("AST Adapter loaded:", typeof ASTAdapter); // or whatever your global name is
+        console.log("Has convert method:", ASTAdapter && ASTAdapter.convert);
+    </script>
+    <script>
+        // Store AST adapter exports if needed
+        window.astAdapterExports = exports;
+        exports = {};
+    </script>
     <!-- Then load parser.js -->
     <script src="./dist/parser.js"></script>
-    <!-- Load AST adapter -->
-    <script src="./dist/astAdapter.js"></script>
     <!-- Then load semanticAanlyzer.js -->
     <script src="./dist/semanticAnalyzer.js"></script>
 </head>
@@ -39,6 +48,17 @@
 <body>
     <div class="container">
         <h1 id="title">CompiLinda</h1>
+        <!-- Test case dropdown -->
+        <div class="test-case-selector">
+            <label for="testCases">Load Test Case:</label>
+            <select id="testCases" onchange="loadTestCase()">
+                <option value="">-- Select a test case --</option>
+                <option value="test1.txt">Test Case 1 (Basic)</option>
+                <option value="test2.txt">Test Case 2 (Variables)</option>
+                <option value="test3.txt">Test Case 3 (Control Flow)</option>
+                <option value="test4.txt">Test Case 4 (Complex)</option>
+            </select>
+        </div>
         <textarea id="sourceCode" placeholder="Enter your source code here (e.g., {}$)"></textarea>
         <div class="button-group">
             <button onclick="compile()">Compile</button>
@@ -76,6 +96,39 @@
     </div>
 
     <script>
+        // Function to load test cases
+        async function loadTestCase() {
+            const select = document.getElementById('testCases');
+            const filename = select.value;
+            
+            if (!filename) return;
+            
+            try {
+                const response = await fetch(`testCases/${filename}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to load test case: ${filename}`);
+                }
+                const code = await response.text();
+                document.getElementById('sourceCode').value = code;
+            } catch (error) {
+                document.getElementById('errorMessage').textContent = error.message;
+                document.getElementById('errorMessage').style.display = 'block';
+            }
+        }
+
+        // Function to clear all inputs and outputs
+        function clearAll() {
+            document.getElementById('sourceCode').value = '';
+            document.getElementById('errorMessage').textContent = '';
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('lexerOutput').innerHTML = '';
+            document.getElementById('parseStatus').innerHTML = '';
+            document.getElementById('cstDisplay').innerHTML = '';
+            document.getElementById('semanticStatus').innerHTML = '';
+            document.getElementById('symbolTableOutput').innerHTML = '';
+            document.getElementById('semanticIssuesOutput').innerHTML = '';
+        }
+
         // Function to ensure both Lexer and Parser are accessible
         function checkDependencies() {
             if (typeof Lexer === 'undefined') {
@@ -99,7 +152,6 @@
             return true;
         }
 
-        // Show the selected tab
         // Show the selected tab
         function showTab(tabName) {
             // Hide all tabs
