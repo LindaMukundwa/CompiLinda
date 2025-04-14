@@ -70,6 +70,7 @@ export class SemanticAnalyzer {
 
     private programCounter: number = 1;
     private lexerLogs: LexerLog[] = []; // Store lexer logs separately
+    cst: any;
 
     /*  constructor(tokens: Token[], lexerLogs: LexerLog[] = []) {
          this.tokens = tokens;
@@ -397,22 +398,22 @@ export class SemanticAnalyzer {
         const name = node.varName;
         const line = node.line;
         const column = node.column;
-
+        
         // Add to symbol table
         this.addSymbol(name, type, line, column);
-
+        
         // If there's an initializer, analyze it
         if (node.initializer) {
             const initType = this.analyzeNode(node.initializer);
-
+            
             // Type checking
-            if (initType !== type) {
+            if (initType && initType !== type) {
                 this.addError(
                     `Type mismatch in initialization: Cannot assign ${initType} to ${type}`,
                     line, column
                 );
             }
-
+            
             // Mark as initialized
             this.markInitialized(name);
         } else {
@@ -422,7 +423,7 @@ export class SemanticAnalyzer {
                 line, column
             );
         }
-
+        
         return type;
     }
 
@@ -519,20 +520,23 @@ export class SemanticAnalyzer {
         const leftType = this.analyzeNode(node.left);
         const rightType = this.analyzeNode(node.right);
         const operator = node.operator;
-
+        
         // Type checking based on operator
         switch (operator) {
             case '+':
-                // Addition works only on int
-                if (leftType !== 'int' || rightType !== 'int') {
+                // Addition works for both int and string in many languages
+                if (leftType === 'int' && rightType === 'int') {
+                    return 'int';
+                } else if (leftType === 'string' && rightType === 'string') {
+                    return 'string';
+                } else {
                     this.addError(
-                        `Operator '+' can only be applied to integers`,
+                        `Type mismatch for operator '+': cannot combine ${leftType} and ${rightType}`,
                         node.line, node.column
                     );
-                    return 'int'; // Assume int for error recovery
+                    return leftType; // Return something for error recovery
                 }
-                return 'int';
-
+                    
             case '==':
             case '!=':
                 // Equality operators require same types
@@ -543,9 +547,9 @@ export class SemanticAnalyzer {
                     );
                 }
                 return 'boolean';
-
+                
             // Add other operators as needed
-
+            
             default:
                 this.addError(
                     `Unknown operator: ${operator}`,
