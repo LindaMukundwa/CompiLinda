@@ -20,6 +20,7 @@
         var exports = {};
         var mainExports = {};
     </script>
+
     <!-- Load main.js first and store its exports -->
     <script src="./dist/main.js"></script>
     <script>
@@ -27,19 +28,22 @@
         exports = {};
     </script>
 
-    <!-- Load AST adapter next - MUST come before parser/semantic analyzer -->
-    <script src="./dist/astAdapter.js"></script>
-    <script>
-        // Forcefully expose to window if needed
-        if (typeof ASTAdapter === 'undefined' && typeof window.astAdapter !== 'undefined') {
-            window.ASTAdapter = window.astAdapter;
-        }
-        console.log('ASTAdapter available:', typeof ASTAdapter !== 'undefined');
-    </script>
+    <!-- Load scripts in dependency order -->
+    <script defer src="./dist/main.js"></script>
+    <script defer src="./dist/astAdapter.js"></script>
+    <script defer src="./dist/parser.js"></script>
+    <script defer src="./dist/semanticAnalyzer.js"></script>
 
-    <!-- Then load other files -->
-    <script src="./dist/parser.js"></script>
-    <script src="./dist/semanticAnalyzer.js"></script>
+    <script>
+        // Wait for all scripts to load
+        window.addEventListener('DOMContentLoaded', function () {
+            console.log('All scripts loaded. Checking components:');
+            console.log('- Lexer available:', typeof Lexer !== 'undefined');
+            console.log('- Parser available:', typeof Parser !== 'undefined');
+            console.log('- ASTAdapter available:', typeof ASTAdapter !== 'undefined');
+            console.log('- SemanticAnalyzer available:', typeof SemanticAnalyzer !== 'undefined');
+        });
+    </script>
 </head>
 
 <body>
@@ -178,44 +182,34 @@
         // updated compile function to not check for lexical errors since parsing handles that problem
         // Complete compilation function that performs lexing, parsing and semantic analysis
         function compile() {
-            // check AST adapter first 
-            try {
-                if (typeof ASTAdapter === 'undefined') {
-                    throw new Error("ASTAdapter not loaded - check console for errors");
-                }
-                if (typeof ASTAdapter.convert !== 'function') {
-                    throw new Error("ASTAdapter.convert is not a function - check adapter implementation");
-                }
-            } catch (error) {
-                const errorDiv = document.getElementById('errorMessage');
-                errorDiv.textContent = `Initialization Error: ${error.message}`;
-                errorDiv.style.display = 'block';
-                console.error("ASTAdapter check failed:", error);
-                return;
-            }
-            if (!checkDependencies()) return;
-
-            const sourceCode = document.getElementById('sourceCode').value;
+            // Clear outputs first
+            const errorDiv = document.getElementById('errorMessage');
             const lexerOutputDiv = document.getElementById('lexerOutput');
             const parseStatusDiv = document.getElementById('parseStatus');
             const cstDisplayDiv = document.getElementById('cstDisplay');
-            const errorDiv = document.getElementById('errorMessage');
             const semanticStatusDiv = document.getElementById('semanticStatus');
             const symbolTableOutput = document.getElementById('symbolTableOutput');
             const semanticIssuesOutput = document.getElementById('semanticIssuesOutput');
 
+            // Clear previous outputs
+            errorDiv.style.display = 'none';
+            errorDiv.textContent = '';
+            lexerOutputDiv.innerHTML = '';
+            parseStatusDiv.innerHTML = '';
+            cstDisplayDiv.innerHTML = '';
+            semanticStatusDiv.innerHTML = '';
+            symbolTableOutput.innerHTML = '';
+            semanticIssuesOutput.innerHTML = '';
+
             try {
+                // Check dependencies first
+                if (!checkDependencies()) return;
+
+                const sourceCode = document.getElementById('sourceCode').value;
+
                 // First, run the lexer
                 const lexer = new Lexer(sourceCode);
                 const lexResult = lexer.tokenize();
-
-                errorDiv.style.display = 'none';
-                lexerOutputDiv.innerHTML = '';
-                parseStatusDiv.innerHTML = '';
-                cstDisplayDiv.innerHTML = '';
-                semanticStatusDiv.innerHTML = '';
-                symbolTableOutput.innerHTML = '';
-                semanticIssuesOutput.innerHTML = '';
 
                 // Display lexer logs
                 lexResult.logs.forEach(log => {
@@ -251,37 +245,48 @@
                     if (!hasParseErrors) {
                         parseStatusDiv.innerHTML += '<div class="parse-success">Parsing successful! Concrete Syntax Tree created.</div>';
 
-                        // Run semantic analyzer if parsing was successful
-                        const semanticAnalyzer = new SemanticAnalyzer(parseResult.ast);
-                        const semanticResult = semanticAnalyzer.analyze();
+                        // Run semantic analyzer with explicit error handling
+                        try {
+                            console.log("Creating semantic analyzer with AST:", parseResult.ast);
+                            const semanticAnalyzer = new SemanticAnalyzer(parseResult.ast);
+                            console.log("Running semantic analysis");
+                            const semanticResult = semanticAnalyzer.analyze();
+                            console.log("Semantic analysis completed:", semanticResult);
 
-                        // Display semantic analysis results
-                        semanticStatusDiv.innerHTML = '<div class="semantic-success">Semantic analysis completed!</div>';
+                            // Display semantic analysis results
+                            semanticStatusDiv.innerHTML = '<div class="semantic-success">Semantic analysis completed!</div>';
 
-                        // Display symbol table
-                        symbolTableOutput.textContent = semanticAnalyzer.printResults();
+                            // Display symbol table
+                            const resultText = semanticAnalyzer.printResults();
+                            console.log("Result text:", resultText);
+                            symbolTableOutput.textContent = resultText;
 
-                        // Show semantic analyzer tab
-                        showTab('semanticAnalyzer');
+                            // Display semantic issues
+                            if (semanticResult.issues && semanticResult.issues.length > 0) {
+                                const issuesText = semanticResult.issues.map(issue =>
+                                    `${issue.type.toUpperCase()} at ${issue.line}:${issue.column} - ${issue.message}`
+                                ).join('\n');
+                                semanticIssuesOutput.textContent = issuesText;
+                            } else {
+                                semanticIssuesOutput.textContent = "No semantic issues found.";
+                            }
+
+                            // Show semantic analyzer tab
+                            showTab('semanticAnalyzer');
+                        } catch (semanticError) {
+                            console.error("Semantic analyzer error:", semanticError);
+                            semanticStatusDiv.innerHTML = `<div class="semantic-error">Semantic analysis failed: ${semanticError.message}</div>`;
+                            errorDiv.textContent = `Semantic Analysis Error: ${semanticError.message}`;
+                            errorDiv.style.display = 'block';
+                        }
                     }
                 } else {
                     cstDisplayDiv.textContent = 'No parse tree available.';
                 }
-
-                //console.log("Parser output:", parseResult);
-                //console.log("AST to convert:", parseResult.ast);
-                //if (!parseResult.ast) {
-                //  throw new Error("Parser returned no AST to convert");
-                //}
             } catch (error) {
-                errorDiv.textContent = error.message;
+                console.error("Compilation error:", error);
+                errorDiv.textContent = `Compilation Error: ${error.message}`;
                 errorDiv.style.display = 'block';
-                lexerOutputDiv.innerHTML = '';
-                parseStatusDiv.innerHTML = '';
-                cstDisplayDiv.innerHTML = '';
-                semanticStatusDiv.innerHTML = '';
-                symbolTableOutput.innerHTML = '';
-                semanticIssuesOutput.innerHTML = '';
             }
         }
     </script>

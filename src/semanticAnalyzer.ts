@@ -115,17 +115,37 @@ export class SemanticAnalyzer {
           this.ast = ASTAdapter.convert(cst);
       } */
 
-    constructor(cst: any) {
-        // Store the CST for reference if needed
-        this.cst = cst;
-
-        // Convert CST to AST using the adapter
-        this.ast = ASTAdapter.convert(cst);
-
-        // Initialize scope
-        this.currentScope = 0;
-        this.scopeStack = [0];
-    }
+          constructor(cst: any) {
+            try {
+                console.log("SemanticAnalyzer initializing with CST:", cst);
+                this.cst = cst;
+                
+                // Check that the adapter is available
+                if (typeof ASTAdapter === 'undefined') {
+                    console.error("ASTAdapter is not defined");
+                    throw new Error("ASTAdapter is not available");
+                }
+                
+                if (typeof ASTAdapter.convert !== 'function') {
+                    console.error("ASTAdapter.convert is not a function");
+                    throw new Error("ASTAdapter.convert is not a function");
+                }
+                
+                // Convert CST to AST using the adapter
+                console.log("Converting CST to AST...");
+                this.ast = ASTAdapter.convert(cst);
+                console.log("AST created:", this.ast);
+                
+                // Initialize scope
+                this.currentScope = 0;
+                this.scopeStack = [0];
+                this.symbolTable = new Map();
+                this.issues = [];
+            } catch (error) {
+                console.error("SemanticAnalyzer constructor error:", error);
+                throw error;
+            }
+        }
 
     /**
      * Main analysis method
