@@ -59,17 +59,14 @@ interface SemanticIssue {
  * Main Semantic Analyzer class
  */
 export class SemanticAnalyzer {
-    // replace this with CST type
-    private cst: any;
-    // Current scope level (increments with each block entry)
-    private currentScope: number = 0;
-    // Stack of scope levels to handle nested scopes
-    private scopeStack: number[] = [0];
-    // Symbol table: maps identifiers to their details across different scopes
-    private symbolTable: Map<string, SymbolTableEntry[]> = new Map();
-    // Track semantic errors
-    private issues: SemanticIssue[] = [];
+
     private ast: ASTNode | null = null;
+    private currentScope: number = 0;       // Current scope level (increments with each block entry)
+    private scopeStack: number[] = [0];     // Stack of scope levels to handle nested scopes
+    private symbolTable: Map<string, SymbolTableEntry[]> = new Map();
+
+    // Track semantic error
+    private issues: {type: 'error'|'warning', message: string, line: number, column: number}[] = [];
 
     private programCounter: number = 1;
     private lexerLogs: LexerLog[] = []; // Store lexer logs separately
