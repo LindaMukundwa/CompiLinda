@@ -109,7 +109,7 @@ h1 {
     font-family: "Source Code Pro", serif;
 }
 
-#parseStatus, #lexerOutput {
+#parseStatus, #lexerOutput, #semanticAnalyzerTab {
     font-family: "Source Code Pro", serif;
     font-size: 12px;
 }
@@ -243,6 +243,11 @@ tr:nth-child(even) {
 }
 
 .parse-error {
+    color: red;
+    font-weight: bold;
+}
+
+#semanticIssuesOutput {
     color: red;
     font-weight: bold;
 }
