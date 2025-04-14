@@ -7,26 +7,6 @@ import { ASTNode, NodeType } from './semanticAnalyzer';
 
 export class ASTAdapter {
 
-
-    /**
-     * Convert the CST from the Parser to the AST format expected by SemanticAnalyzer
-     */
-    /* public static convert(cstRoot: CSTNode): ASTNode | null {
-        //if (!cstRoot) return null;
-        if (!cstRoot || !cstRoot.name) {
-            // Return a minimal valid program node for empty input
-            return {
-                type: NodeType.Program,
-                line: 0,
-                column: 0,
-                children: []
-            };
-        }
-
-        // Start conversion at the root
-        return this.convertNode(cstRoot);
-    } */
-
     public static convert(cstRoot: CSTNode): ASTNode | null {
         if (!cstRoot) return null;
         return this.convertNode(cstRoot);
@@ -460,10 +440,7 @@ const exportAdapter = {
     ASTAdapter
 };
 
-// For browser environment
 if (typeof window !== 'undefined') {
-    window.ASTAdapter = ASTAdapter;
+    (window as any).ASTAdapter = ASTAdapter;
 }
-
-// For module systems
-export default exportAdapter;
+export default ASTAdapter;

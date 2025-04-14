@@ -30,9 +30,8 @@
 
     <!-- Load scripts in dependency order -->
     <script defer src="./dist/main.js"></script>
-    <script defer src="./dist/astAdapter.js"></script>
     <script defer src="./dist/parser.js"></script>
-    <script defer src="./dist/semanticAnalyzer.js"></script>
+    <script defer src="./dist/combinedAnalyzer.js"></script>
 
     <script>
         // Wait for all scripts to load
@@ -40,7 +39,7 @@
             console.log('All scripts loaded. Checking components:');
             console.log('- Lexer available:', typeof Lexer !== 'undefined');
             console.log('- Parser available:', typeof Parser !== 'undefined');
-            console.log('- ASTAdapter available:', typeof ASTAdapter !== 'undefined');
+            //console.log('- ASTAdapter available:', typeof ASTAdapter !== 'undefined');
             console.log('- SemanticAnalyzer available:', typeof SemanticAnalyzer !== 'undefined');
         });
     </script>
