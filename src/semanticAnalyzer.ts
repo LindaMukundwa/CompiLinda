@@ -50,7 +50,7 @@ interface SemanticIssue {
     message: string;
     line: number;
     column: number;
-    
+
 }
 
 /**
@@ -66,53 +66,65 @@ export class SemanticAnalyzer {
     private symbolTable: Map<string, SymbolTableEntry[]> = new Map();
 
     // Track semantic error
-    private issues: {type: 'error'|'warning', message: string, line: number, column: number}[] = [];
+    private issues: { type: 'error' | 'warning', message: string, line: number, column: number }[] = [];
 
     private programCounter: number = 1;
     private lexerLogs: LexerLog[] = []; // Store lexer logs separately
 
-   /*  constructor(tokens: Token[], lexerLogs: LexerLog[] = []) {
-        this.tokens = tokens;
-        this.lexerLogs = lexerLogs; // Store the lexer logs
-        this.logs = [...lexerLogs]; // Include lexer logs in our logs
-        this.addLog('INFO', `PARSER -- Parsing program ${this.programCounter}...`);
-    } */
-    
+    /*  constructor(tokens: Token[], lexerLogs: LexerLog[] = []) {
+         this.tokens = tokens;
+         this.lexerLogs = lexerLogs; // Store the lexer logs
+         this.logs = [...lexerLogs]; // Include lexer logs in our logs
+         this.addLog('INFO', `PARSER -- Parsing program ${this.programCounter}...`);
+     } */
+
     /**
      * Constructor takes the CST from your parser
      */
     /**
      * Constructor takes the CST from your parser
      */
-   /*  constructor(cst: any) {
+    /*  constructor(cst: any) {
+         this.cst = cst;
+         //this.ast = cst;
+         // Convert CST to AST using the adapter
+         this.ast = ASTAdapter.convert(cst);
+         //this.addLog('INFO', `SEMANTIC ANALYZER -- Analyzing program ${this.programCounter}...`);
+     } */
+
+    /* // Adding log
+    private addLog(level: 'INFO' | 'DEBUG' | 'ERROR' | 'WARNING', message: string): void {
+       this.logs.push({ // need to change error messaging 
+           level,
+           message
+       });
+   } */
+
+    /*   constructor(cst: any) {
+          this.cst = cst;
+          
+          // Debug check
+          if (typeof ASTAdapter === 'undefined') {
+              throw new Error("ASTAdapter is not available in global scope");
+          }
+          if (typeof ASTAdapter.convert !== 'function') {
+              throw new Error("ASTAdapter.convert is not a function");
+          }
+          
+          this.ast = ASTAdapter.convert(cst);
+      } */
+
+    constructor(cst: any) {
+        // Store the CST for reference if needed
         this.cst = cst;
-        //this.ast = cst;
+
         // Convert CST to AST using the adapter
         this.ast = ASTAdapter.convert(cst);
-        //this.addLog('INFO', `SEMANTIC ANALYZER -- Analyzing program ${this.programCounter}...`);
-    } */
 
-     /* // Adding log
-     private addLog(level: 'INFO' | 'DEBUG' | 'ERROR' | 'WARNING', message: string): void {
-        this.logs.push({ // need to change error messaging 
-            level,
-            message
-        });
-    } */
-
-        constructor(cst: any) {
-            this.cst = cst;
-            
-            // Debug check
-            if (typeof ASTAdapter === 'undefined') {
-                throw new Error("ASTAdapter is not available in global scope");
-            }
-            if (typeof ASTAdapter.convert !== 'function') {
-                throw new Error("ASTAdapter.convert is not a function");
-            }
-            
-            this.ast = ASTAdapter.convert(cst);
-        }
+        // Initialize scope
+        this.currentScope = 0;
+        this.scopeStack = [0];
+    }
 
     /**
      * Main analysis method
@@ -131,13 +143,13 @@ export class SemanticAnalyzer {
                 ast: null
             };
         }
-        
+
         // Start the recursive analysis from the root of the AST
         this.analyzeNode(this.ast);
-        
+
         // Check for any remaining unused variables in global scope
         this.checkForUnusedVariables(0);
-        
+
         return {
             symbolTable: this.symbolTable,
             issues: this.issues,
@@ -150,67 +162,157 @@ export class SemanticAnalyzer {
      */
     public printResults(): string {
         let output = `Program 1 Abstract Syntax Tree\n`;
-        output += '---------------------------------------------------\n';
+        output += '-------------------------------\n';
         output += this.printAST(this.ast);
         output += '\n';
-    
+
         output += `Program 1 Symbol Table\n`;
-        output += '---------------------------------------------------\n';
-        output += 'NAME\tTYPE\tisINIT?\tisUSED?\tSCOPE\n';
-        output += '---------------------------------------------------\n';
-        
-        // Add symbol table entries
-        this.symbolTable.forEach((entries, name) => {
-            entries.forEach(entry => {
-                output += `${name}\t${entry.type}\t${entry.initialized}\t${entry.used}\t${entry.scope}\n`;
+        output += '--------------------------------------\n';
+        output += 'Name\tType\tScope\tLine\n';
+        output += '-------------------------------------\n';
+
+        // Sort symbol table entries for consistent output
+        const entries: SymbolTableEntry[] = [];
+        this.symbolTable.forEach((symbolEntries, name) => {
+            symbolEntries.forEach(entry => {
+                entries.push({ ...entry, name });
             });
         });
-    
+
+        // Sort by scope and then by line number
+        entries.sort((a, b) => {
+            if (a.scope !== b.scope) return a.scope - b.scope;
+            return a.line - b.line;
+        });
+
+        // Print each entry
+        entries.forEach(entry => {
+            // Convert type string to match expected output (bool instead of boolean)
+            const displayType = entry.type === 'boolean' ? 'bool' : entry.type;
+            output += `${entry.name}\t${displayType}\t${entry.scope}\t${entry.line}\n`;
+        });
+
         output += '\nSEMANTIC ANALYZER --> ';
         if (this.issues.some(issue => issue.type === 'error')) {
             output += 'Semantic Analysis completed with errors\n';
         } else {
             output += 'Semantic Analysis completed successfully\n';
         }
-        
+
         return output;
     }
 
     /**
  * Print the AST in a readable format
  */
-private printAST(node: ASTNode | null, indent: string = ''): string {
-    if (!node) return '';
-    
-    let output = '';
-    switch (node.type) {
-        case NodeType.Program:
-            output += `${indent}<Program>\n`;
-            if (node.children) {
-                for (const child of node.children) {
-                    output += this.printAST(child, indent + '  ');
+    private printAST(node: ASTNode | null, indent: string = ''): string {
+        if (!node) return '';
+
+        let output = '';
+
+        switch (node.type) {
+            case NodeType.Program:
+                output += `${indent}< PROGRAM >\n`;
+                if (node.children) {
+                    for (const child of node.children) {
+                        output += this.printAST(child, indent + '-');
+                    }
                 }
-            }
-            break;
-        case NodeType.Block:
-            output += `${indent}<Block>\n`;
-            if (node.children) {
-                for (const child of node.children) {
-                    output += this.printAST(child, indent + '  ');
+                break;
+            case NodeType.Block:
+                output += `${indent}< BLOCK >\n`;
+                if (node.children) {
+                    for (const child of node.children) {
+                        output += this.printAST(child, indent + '-');
+                    }
                 }
-            }
-            break;
-        // Add cases for other node types as needed
-        default:
-            output += `${indent}<${NodeType[node.type]}>\n`;
-            if (node.children) {
-                for (const child of node.children) {
-                    output += this.printAST(child, indent + '  ');
+                break;
+            case NodeType.VarDeclaration:
+                output += `${indent}< Variable Declaration >\n`;
+                output += `${indent}--[ ${node.varType} ]\n`;
+                output += `${indent}--[ ${node.varName} ]\n`;
+                break;
+            case NodeType.PrintStatement:
+                output += `${indent}< Print Statement >\n`;
+                if (node.expression) {
+                    output += this.printAST(node.expression, indent + '--');
                 }
-            }
+                break;
+            case NodeType.AssignmentStatement:
+                output += `${indent}< Assignment Statement >\n`;
+                if (node.identifier) {
+                    output += `${indent}---[ ${node.identifier.value || node.identifier.name} ]\n`;
+                }
+                if (node.expression) {
+                    if (node.expression.type === NodeType.IntegerLiteral) {
+                        output += `${indent}---[ ${node.expression.value} ]\n`;
+                    } else if (node.expression.type === NodeType.StringLiteral) {
+                        output += `${indent}---[ ${node.expression.value} ]\n`;
+                    } else if (node.expression.type === NodeType.BooleanLiteral) {
+                        output += `${indent}---[ ${node.expression.value ? 'true' : 'false'} ]\n`;
+                    } else {
+                        output += this.printAST(node.expression, indent + '---');
+                    }
+                }
+                break;
+            case NodeType.Identifier:
+                output += `${indent}[ ${node.name || node.value} ]\n`;
+                break;
+            case NodeType.IntegerLiteral:
+                output += `${indent}[ ${node.value} ]\n`;
+                break;
+            case NodeType.StringLiteral:
+                output += `${indent}[ ${node.value} ]\n`;
+                break;
+            case NodeType.BooleanLiteral:
+                output += `${indent}[ ${node.value ? 'true' : 'false'} ]\n`;
+                break;
+            case NodeType.IfStatement:
+                output += `${indent}< If Statement >\n`;
+                output += `${indent}--< Condition >\n`;
+                if (node.condition) {
+                    output += this.printAST(node.condition, indent + '----');
+                }
+                output += `${indent}--< Then >\n`;
+                if (node.thenBranch) {
+                    output += this.printAST(node.thenBranch, indent + '----');
+                }
+                if (node.elseBranch) {
+                    output += `${indent}--< Else >\n`;
+                    output += this.printAST(node.elseBranch, indent + '----');
+                }
+                break;
+            case NodeType.WhileStatement:
+                output += `${indent}< While Statement >\n`;
+                output += `${indent}--< Condition >\n`;
+                if (node.condition) {
+                    output += this.printAST(node.condition, indent + '----');
+                }
+                output += `${indent}--< Body >\n`;
+                if (node.body) {
+                    output += this.printAST(node.body, indent + '----');
+                }
+                break;
+            case NodeType.BinaryExpression:
+                output += `${indent}< Binary Expression >\n`;
+                output += `${indent}--[ ${node.operator} ]\n`;
+                if (node.left) {
+                    output += this.printAST(node.left, indent + '----');
+                }
+                if (node.right) {
+                    output += this.printAST(node.right, indent + '----');
+                }
+                break;
+            default:
+                output += `${indent}< ${NodeType[node.type]} >\n`;
+                if (node.children) {
+                    for (const child of node.children) {
+                        output += this.printAST(child, indent + '--');
+                    }
+                }
+        }
+        return output;
     }
-    return output;
-}
 
     /**
      * Analyze a CST node recursively
@@ -274,14 +376,14 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
     private analyzeBlock(node: any): string | null {
         // Enter a new scope
         this.enterScope();
-        
+
         // Process all statements in the block
         if (node.children && Array.isArray(node.children)) {
             for (const child of node.children) {
                 this.analyzeNode(child);
             }
         }
-        
+
         // Exit the scope when done with the block
         this.exitScope();
         return null;
@@ -295,14 +397,14 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
         const name = node.varName;
         const line = node.line;
         const column = node.column;
-        
+
         // Add to symbol table
         this.addSymbol(name, type, line, column);
-        
+
         // If there's an initializer, analyze it
         if (node.initializer) {
             const initType = this.analyzeNode(node.initializer);
-            
+
             // Type checking
             if (initType !== type) {
                 this.addError(
@@ -310,7 +412,7 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
                     line, column
                 );
             }
-            
+
             // Mark as initialized
             this.markInitialized(name);
         } else {
@@ -320,7 +422,7 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
                 line, column
             );
         }
-        
+
         return type;
     }
 
@@ -331,7 +433,7 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
         const name = node.identifier.value;
         const line = node.line;
         const column = node.column;
-        
+
         // Check if variable exists
         const symbol = this.getSymbol(name);
         if (!symbol) {
@@ -341,11 +443,11 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
             );
             return null;
         }
-        
+
         // Mark as initialized and used
         this.markInitialized(name);
         this.markUsed(name);
-        
+
         // Type check the expression
         const exprType = this.analyzeNode(node.expression);
         if (exprType !== symbol.type) {
@@ -354,7 +456,7 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
                 line, column
             );
         }
-        
+
         return symbol.type;
     }
 
@@ -370,15 +472,15 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
                 node.line, node.column
             );
         }
-        
+
         // Analyze then-branch
         this.analyzeNode(node.thenBranch);
-        
+
         // Analyze else-branch if it exists
         if (node.elseBranch) {
             this.analyzeNode(node.elseBranch);
         }
-        
+
         return null;
     }
 
@@ -394,10 +496,10 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
                 node.line, node.column
             );
         }
-        
+
         // Analyze body
         this.analyzeNode(node.body);
-        
+
         return null;
     }
 
@@ -417,7 +519,7 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
         const leftType = this.analyzeNode(node.left);
         const rightType = this.analyzeNode(node.right);
         const operator = node.operator;
-        
+
         // Type checking based on operator
         switch (operator) {
             case '+':
@@ -430,7 +532,7 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
                     return 'int'; // Assume int for error recovery
                 }
                 return 'int';
-                
+
             case '==':
             case '!=':
                 // Equality operators require same types
@@ -441,9 +543,9 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
                     );
                 }
                 return 'boolean';
-                
+
             // Add other operators as needed
-            
+
             default:
                 this.addError(
                     `Unknown operator: ${operator}`,
@@ -458,7 +560,7 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
      */
     private analyzeIdentifier(node: any): string | null {
         const name = node.value;
-        
+
         // Look up the symbol
         const symbol = this.getSymbol(name);
         if (!symbol) {
@@ -468,10 +570,10 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
             );
             return null;
         }
-        
+
         // Mark as used
         this.markUsed(name);
-        
+
         // Check if it's initialized
         if (!symbol.initialized) {
             this.addWarning(
@@ -479,7 +581,7 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
                 node.line, node.column
             );
         }
-        
+
         return symbol.type;
     }
 
@@ -499,7 +601,7 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
     private exitScope(): void {
         // Check for unused variables in the scope we're exiting
         this.checkForUnusedVariables(this.currentScope);
-        
+
         this.scopeStack.pop();
         this.currentScope = this.scopeStack[this.scopeStack.length - 1];
     }
@@ -543,7 +645,7 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
             initialized: false,
             used: false
         };
-        
+
         // Check for redeclaration in the same scope
         const existingEntries = this.symbolTable.get(name) || [];
         for (const existing of existingEntries) {
@@ -555,7 +657,7 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
                 return;
             }
         }
-        
+
         // Add the new entry
         existingEntries.push(entry);
         this.symbolTable.set(name, existingEntries);
@@ -570,18 +672,18 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
         if (!entries || entries.length === 0) {
             return null;
         }
-        
+
         // Find the entry in the most immediate enclosing scope
         for (let i = this.scopeStack.length - 1; i >= 0; i--) {
             const currentScope = this.scopeStack[i];
-            
+
             for (const entry of entries) {
                 if (entry.scope <= currentScope) {
                     return entry;
                 }
             }
         }
-        
+
         return null;
     }
 
@@ -607,9 +709,9 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
 
     // ===== Error Handling Methods =====
 
-  /*  
-     * Add an error to the issues list
-     */
+    /*  
+       * Add an error to the issues list
+       */
     private addError(message: string, line: number, column: number): void {
         this.issues.push({
             type: 'error',
@@ -629,7 +731,7 @@ private printAST(node: ASTNode | null, indent: string = ''): string {
             line,
             column
         });
-    } 
+    }
 }
 
 // Export for browser
