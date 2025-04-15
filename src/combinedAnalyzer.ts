@@ -493,34 +493,25 @@ export class SemanticAnalyzer {
         try {
             console.log("SemanticAnalyzer initializing with CST:", cst);
             this.cst = cst;
-
-            // Check that the adapter is available
-            if (typeof ASTAdapter === 'undefined') {
-                console.error("ASTAdapter is not defined");
-                throw new Error("ASTAdapter is not available");
-            }
-
-            if (typeof ASTAdapter.convert !== 'function') {
-                console.error("ASTAdapter.convert is not a function");
-                throw new Error("ASTAdapter.convert is not a function");
-            }
-
-            // Convert CST to AST using the adapter
-            console.log("Converting CST to AST...");
+    
+            // Initialize all state fresh for each new instance
             this.ast = ASTAdapter.convert(cst);
             console.log("AST created:", this.ast);
-
+    
             // Initialize scope
             this.currentScope = 0;
             this.scopeStack = [0];
-            this.symbolTable = new Map();
-            this.issues = [];
+            this.symbolTable = new Map();  // Fresh symbol table
+            this.issues = [];             // Fresh issues list
+            this.programCounter = 1;      // Reset program counter
+            this.lexerLogs = [];          // Reset lexer logs
         } catch (error) {
             console.error("SemanticAnalyzer constructor error:", error);
             throw error;
         }
     }
 
+    
     /**
      * Main analysis method
      * Returns analysis results including symbol table and issues

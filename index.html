@@ -205,84 +205,150 @@
             if (!checkDependencies()) return;
 
             const sourceCode = document.getElementById('sourceCode').value;
+            
+            // Split source code into separate programs by $
+            const programSources = sourceCode.split('$').filter(p => p.trim().length > 0);
+            
+            // If no programs found, return
+            if (programSources.length === 0) {
+                errorDiv.textContent = 'No programs found (must be separated by $)';
+                errorDiv.style.display = 'block';
+                return;
+            }
 
-            // First, run the lexer
-            const lexer = new Lexer(sourceCode);
-            const lexResult = lexer.tokenize();
+            // Process each program individually
+            let allResults = '';
+            let allIssues = [];
+            
+            for (let i = 0; i < programSources.length; i++) {
+                const programSource = programSources[i].trim();
+                
+                // First, run the lexer
+                const lexer = new Lexer(programSource);
+                const lexResult = lexer.tokenize();
 
-            // Display lexer logs
-            lexResult.logs.forEach(log => {
-                const logElement = document.createElement('div');
-                logElement.className = `log-${log.level.toLowerCase()}`;
-                logElement.textContent = log.message;
-                lexerOutputDiv.appendChild(logElement);
-            });
+                // Display lexer logs (only for first program)
+                if (i === 0) {
+                    lexResult.logs.forEach(log => {
+                        const logElement = document.createElement('div');
+                        logElement.className = `log-${log.level.toLowerCase()}`;
+                        logElement.textContent = log.message;
+                        lexerOutputDiv.appendChild(logElement);
+                    });
+                }
 
-            // Show lexer tab
-            showTab('lexer');
+                // Then, run the parser
+                const parser = new Parser(lexResult.tokens);
+                const parseResult = parser.parse();
 
-            // Then, run the parser
-            const parser = new Parser(lexResult.tokens);
-            const parseResult = parser.parse();
+                // Display parser logs (only for first program)
+                if (i === 0) {
+                    parseResult.logs.forEach(log => {
+                        const logElement = document.createElement('div');
+                        logElement.className = `log-${log.level.toLowerCase()}`;
+                        logElement.textContent = log.message;
+                        parseStatusDiv.appendChild(logElement);
+                    });
+                }
 
-            // Display parser logs
-            parseResult.logs.forEach(log => {
-                const logElement = document.createElement('div');
-                logElement.className = `log-${log.level.toLowerCase()}`;
-                logElement.textContent = log.message;
-                parseStatusDiv.appendChild(logElement);
-            });
+                // Process AST if parsing was successful
+                if (parseResult.ast) {
+                    // Display CST (only for first program)
+                    if (i === 0) {
+                        const cstOutput = parser.printCST(parseResult.ast);
+                        cstDisplayDiv.textContent = cstOutput;
+                    }
 
-            // Display CST if parsing was successful
-            if (parseResult.ast) {
-                const cstOutput = parser.printCST(parseResult.ast);
-                cstDisplayDiv.textContent = cstOutput;
+                    // Check if parsing had errors
+                    const hasParseErrors = parseResult.logs.some(log => log.level === 'ERROR');
 
-                // Check if parsing had errors
-                const hasParseErrors = parseResult.logs.some(log => log.level === 'ERROR');
-
-                if (!hasParseErrors) {
-                    parseStatusDiv.innerHTML += '<div class="parse-success">Parsing successful! Concrete Syntax Tree created.</div>';
-
-                    // Run semantic analyzer with explicit error handling
-                    try {
-                        console.log("Creating semantic analyzer with AST:", parseResult.ast);
-                        // Create a NEW semantic analyzer instance each time
-                        const semanticAnalyzer = new SemanticAnalyzer(parseResult.ast);
-                        console.log("Running semantic analysis");
-                        const semanticResult = semanticAnalyzer.analyze();
-                        console.log("Semantic analysis completed:", semanticResult);
-
-                        // Display semantic analysis results
-                        semanticStatusDiv.innerHTML = '<div class="semantic-success"></div>';
-
-                        // Display symbol table
-                        const resultText = semanticAnalyzer.printResults();
-                        console.log("Result text:", resultText);
-                        symbolTableOutput.textContent = resultText;
-
-                        // Display semantic issues
-                        if (semanticResult.issues && semanticResult.issues.length > 0) {
-                            const issuesText = semanticResult.issues.map(issue =>
-                                `${issue.type.toUpperCase()} at ${issue.line}:${issue.column} - ${issue.message}`
-                            ).join('\n');
-                            semanticIssuesOutput.textContent = issuesText;
-                        } else {
-                            semanticIssuesOutput.textContent = "No semantic issues found.";
+                    if (!hasParseErrors) {
+                        if (i === 0) {
+                            parseStatusDiv.innerHTML += '<div class="parse-success">Parsing successful! Concrete Syntax Tree created.</div>';
                         }
 
-                        // Show semantic analyzer tab
-                        showTab('semanticAnalyzer');
-                    } catch (semanticError) {
-                        console.error("Semantic analyzer error:", semanticError);
-                        semanticStatusDiv.innerHTML = `<div class="semantic-error">Semantic analysis failed: ${semanticError.message}</div>`;
-                        errorDiv.textContent = `Semantic Analysis Error: ${semanticError.message}`;
-                        errorDiv.style.display = 'block';
+                        // Run semantic analyzer
+                        try {
+                            const semanticAnalyzer = new SemanticAnalyzer(parseResult.ast);
+                            const semanticResult = semanticAnalyzer.analyze();
+
+                            // Accumulate results
+                            allResults += `Program ${i+1} Abstract Syntax Tree\n`;
+                            allResults += '-------------------------------\n';
+                            allResults += semanticAnalyzer.printAST(semanticResult.ast);
+                            allResults += '\n\n';
+
+                            allResults += `Program ${i+1} Symbol Table\n`;
+                            allResults += '--------------------------------------\n';
+                            allResults += 'Name\tType\tScope\tLine\n';
+                            allResults += '-------------------------------------\n';
+
+                            // Format symbol table entries
+                            const entries = [];
+                            semanticResult.symbolTable.forEach((symbolEntries, name) => {
+                                symbolEntries.forEach(entry => {
+                                    entries.push({ ...entry, name });
+                                });
+                            });
+
+                            // Sort entries
+                            entries.sort((a, b) => {
+                                if (a.scope !== b.scope) return a.scope - b.scope;
+                                return a.line - b.line;
+                            });
+
+                            // Add to results
+                            entries.forEach(entry => {
+                                const displayType = entry.type === 'boolean' ? 'bool' : entry.type;
+                                allResults += `${entry.name}\t${displayType}\t${entry.scope}\t${entry.line}\n`;
+                            });
+
+                            allResults += '\nSEMANTIC ANALYZER --> ';
+                            if (semanticResult.issues.some(issue => issue.type === 'error')) {
+                                allResults += 'Semantic Analysis completed with errors\n\n';
+                            } else {
+                                allResults += 'Semantic Analysis completed successfully\n\n';
+                            }
+
+                            // Accumulate issues
+                            semanticResult.issues.forEach(issue => {
+                                allIssues.push({
+                                    program: i+1,
+                                    type: issue.type,
+                                    message: issue.message,
+                                    line: issue.line,
+                                    column: issue.column
+                                });
+                            });
+
+                        } catch (semanticError) {
+                            console.error("Semantic analyzer error:", semanticError);
+                            if (i === 0) {
+                                semanticStatusDiv.innerHTML = `<div class="semantic-error">Semantic analysis failed: ${semanticError.message}</div>`;
+                                errorDiv.textContent = `Semantic Analysis Error: ${semanticError.message}`;
+                                errorDiv.style.display = 'block';
+                            }
+                        }
                     }
                 }
-            } else {
-                cstDisplayDiv.textContent = 'No parse tree available.';
             }
+
+            // Display all results in the semantic analyzer tab
+            symbolTableOutput.textContent = allResults;
+            
+            // Display all issues
+            if (allIssues.length > 0) {
+                const issuesText = allIssues.map(issue =>
+                    `Program ${issue.program}: ${issue.type.toUpperCase()} at ${issue.line}:${issue.column} - ${issue.message}`
+                ).join('\n');
+                semanticIssuesOutput.textContent = issuesText;
+            } else {
+                semanticIssuesOutput.textContent = "No semantic issues found across all programs.";
+            }
+
+            // Show semantic analyzer tab
+            showTab('semanticAnalyzer');
+
         } catch (error) {
             console.error("Compilation error:", error);
             errorDiv.textContent = `Compilation Error: ${error.message}`;
