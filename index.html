@@ -84,7 +84,7 @@
             <div id="semanticStatus"></div>
             <div class="semantic-sections">
                 <div class="semantic-section">
-                    <h3>Symbol Table</h3>
+                    <h3>Semantic Analysis</h3>
                     <pre id="symbolTableOutput"></pre>
                 </div>
                 <div class="semantic-section">
@@ -181,113 +181,114 @@
         // updated compile function to not check for lexical errors since parsing handles that problem
         // Complete compilation function that performs lexing, parsing and semantic analysis
         function compile() {
-            // Clear outputs first
-            const errorDiv = document.getElementById('errorMessage');
-            const lexerOutputDiv = document.getElementById('lexerOutput');
-            const parseStatusDiv = document.getElementById('parseStatus');
-            const cstDisplayDiv = document.getElementById('cstDisplay');
-            const semanticStatusDiv = document.getElementById('semanticStatus');
-            const symbolTableOutput = document.getElementById('symbolTableOutput');
-            const semanticIssuesOutput = document.getElementById('semanticIssuesOutput');
+        // Clear outputs first
+        const errorDiv = document.getElementById('errorMessage');
+        const lexerOutputDiv = document.getElementById('lexerOutput');
+        const parseStatusDiv = document.getElementById('parseStatus');
+        const cstDisplayDiv = document.getElementById('cstDisplay');
+        const semanticStatusDiv = document.getElementById('semanticStatus');
+        const symbolTableOutput = document.getElementById('symbolTableOutput');
+        const semanticIssuesOutput = document.getElementById('semanticIssuesOutput');
 
-            // Clear previous outputs
-            errorDiv.style.display = 'none';
-            errorDiv.textContent = '';
-            lexerOutputDiv.innerHTML = '';
-            parseStatusDiv.innerHTML = '';
-            cstDisplayDiv.innerHTML = '';
-            semanticStatusDiv.innerHTML = '';
-            symbolTableOutput.innerHTML = '';
-            semanticIssuesOutput.innerHTML = '';
+        // Clear previous outputs
+        errorDiv.style.display = 'none';
+        errorDiv.textContent = '';
+        lexerOutputDiv.innerHTML = '';
+        parseStatusDiv.innerHTML = '';
+        cstDisplayDiv.innerHTML = '';
+        semanticStatusDiv.innerHTML = '';
+        symbolTableOutput.innerHTML = '';
+        semanticIssuesOutput.innerHTML = '';
 
-            try {
-                // Check dependencies first
-                if (!checkDependencies()) return;
+        try {
+            // Check dependencies first
+            if (!checkDependencies()) return;
 
-                const sourceCode = document.getElementById('sourceCode').value;
+            const sourceCode = document.getElementById('sourceCode').value;
 
-                // First, run the lexer
-                const lexer = new Lexer(sourceCode);
-                const lexResult = lexer.tokenize();
+            // First, run the lexer
+            const lexer = new Lexer(sourceCode);
+            const lexResult = lexer.tokenize();
 
-                // Display lexer logs
-                lexResult.logs.forEach(log => {
-                    const logElement = document.createElement('div');
-                    logElement.className = `log-${log.level.toLowerCase()}`;
-                    logElement.textContent = log.message;
-                    lexerOutputDiv.appendChild(logElement);
-                });
+            // Display lexer logs
+            lexResult.logs.forEach(log => {
+                const logElement = document.createElement('div');
+                logElement.className = `log-${log.level.toLowerCase()}`;
+                logElement.textContent = log.message;
+                lexerOutputDiv.appendChild(logElement);
+            });
 
-                // Show lexer tab
-                showTab('lexer');
+            // Show lexer tab
+            showTab('lexer');
 
-                // Then, run the parser
-                const parser = new Parser(lexResult.tokens);
-                const parseResult = parser.parse();
+            // Then, run the parser
+            const parser = new Parser(lexResult.tokens);
+            const parseResult = parser.parse();
 
-                // Display parser logs
-                parseResult.logs.forEach(log => {
-                    const logElement = document.createElement('div');
-                    logElement.className = `log-${log.level.toLowerCase()}`;
-                    logElement.textContent = log.message;
-                    parseStatusDiv.appendChild(logElement);
-                });
+            // Display parser logs
+            parseResult.logs.forEach(log => {
+                const logElement = document.createElement('div');
+                logElement.className = `log-${log.level.toLowerCase()}`;
+                logElement.textContent = log.message;
+                parseStatusDiv.appendChild(logElement);
+            });
 
-                // Display CST if parsing was successful
-                if (parseResult.ast) {
-                    const cstOutput = parser.printCST(parseResult.ast);
-                    cstDisplayDiv.textContent = cstOutput;
+            // Display CST if parsing was successful
+            if (parseResult.ast) {
+                const cstOutput = parser.printCST(parseResult.ast);
+                cstDisplayDiv.textContent = cstOutput;
 
-                    // Check if parsing had errors
-                    const hasParseErrors = parseResult.logs.some(log => log.level === 'ERROR');
+                // Check if parsing had errors
+                const hasParseErrors = parseResult.logs.some(log => log.level === 'ERROR');
 
-                    if (!hasParseErrors) {
-                        parseStatusDiv.innerHTML += '<div class="parse-success">Parsing successful! Concrete Syntax Tree created.</div>';
+                if (!hasParseErrors) {
+                    parseStatusDiv.innerHTML += '<div class="parse-success">Parsing successful! Concrete Syntax Tree created.</div>';
 
-                        // Run semantic analyzer with explicit error handling
-                        try {
-                            console.log("Creating semantic analyzer with AST:", parseResult.ast);
-                            const semanticAnalyzer = new SemanticAnalyzer(parseResult.ast);
-                            console.log("Running semantic analysis");
-                            const semanticResult = semanticAnalyzer.analyze();
-                            console.log("Semantic analysis completed:", semanticResult);
+                    // Run semantic analyzer with explicit error handling
+                    try {
+                        console.log("Creating semantic analyzer with AST:", parseResult.ast);
+                        // Create a NEW semantic analyzer instance each time
+                        const semanticAnalyzer = new SemanticAnalyzer(parseResult.ast);
+                        console.log("Running semantic analysis");
+                        const semanticResult = semanticAnalyzer.analyze();
+                        console.log("Semantic analysis completed:", semanticResult);
 
-                            // Display semantic analysis results
-                            semanticStatusDiv.innerHTML = '<div class="semantic-success">Semantic analysis completed!</div>';
+                        // Display semantic analysis results
+                        semanticStatusDiv.innerHTML = '<div class="semantic-success"></div>';
 
-                            // Display symbol table
-                            const resultText = semanticAnalyzer.printResults();
-                            console.log("Result text:", resultText);
-                            symbolTableOutput.textContent = resultText;
+                        // Display symbol table
+                        const resultText = semanticAnalyzer.printResults();
+                        console.log("Result text:", resultText);
+                        symbolTableOutput.textContent = resultText;
 
-                            // Display semantic issues
-                            if (semanticResult.issues && semanticResult.issues.length > 0) {
-                                const issuesText = semanticResult.issues.map(issue =>
-                                    `${issue.type.toUpperCase()} at ${issue.line}:${issue.column} - ${issue.message}`
-                                ).join('\n');
-                                semanticIssuesOutput.textContent = issuesText;
-                            } else {
-                                semanticIssuesOutput.textContent = "No semantic issues found.";
-                            }
-
-                            // Show semantic analyzer tab
-                            showTab('semanticAnalyzer');
-                        } catch (semanticError) {
-                            console.error("Semantic analyzer error:", semanticError);
-                            semanticStatusDiv.innerHTML = `<div class="semantic-error">Semantic analysis failed: ${semanticError.message}</div>`;
-                            errorDiv.textContent = `Semantic Analysis Error: ${semanticError.message}`;
-                            errorDiv.style.display = 'block';
+                        // Display semantic issues
+                        if (semanticResult.issues && semanticResult.issues.length > 0) {
+                            const issuesText = semanticResult.issues.map(issue =>
+                                `${issue.type.toUpperCase()} at ${issue.line}:${issue.column} - ${issue.message}`
+                            ).join('\n');
+                            semanticIssuesOutput.textContent = issuesText;
+                        } else {
+                            semanticIssuesOutput.textContent = "No semantic issues found.";
                         }
+
+                        // Show semantic analyzer tab
+                        showTab('semanticAnalyzer');
+                    } catch (semanticError) {
+                        console.error("Semantic analyzer error:", semanticError);
+                        semanticStatusDiv.innerHTML = `<div class="semantic-error">Semantic analysis failed: ${semanticError.message}</div>`;
+                        errorDiv.textContent = `Semantic Analysis Error: ${semanticError.message}`;
+                        errorDiv.style.display = 'block';
                     }
-                } else {
-                    cstDisplayDiv.textContent = 'No parse tree available.';
                 }
-            } catch (error) {
-                console.error("Compilation error:", error);
-                errorDiv.textContent = `Compilation Error: ${error.message}`;
-                errorDiv.style.display = 'block';
+            } else {
+                cstDisplayDiv.textContent = 'No parse tree available.';
             }
+        } catch (error) {
+            console.error("Compilation error:", error);
+            errorDiv.textContent = `Compilation Error: ${error.message}`;
+            errorDiv.style.display = 'block';
         }
+    }
     </script>
 </body>
 
