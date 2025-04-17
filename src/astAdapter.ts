@@ -12,6 +12,8 @@ export class ASTAdapter {
         return this.convertNode(cstRoot);
     }
 
+    // need to add more cases for testing as well as validating empty expressions without the AST looking strange
+
     /**
      * Convert a CST node to an AST node
      */
