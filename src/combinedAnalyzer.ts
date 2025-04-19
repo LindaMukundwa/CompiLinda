@@ -482,17 +482,20 @@ export class SemanticAnalyzer {
     private symbolTable: Map<string, SymbolTableEntry[]> = new Map();
 
     // Track semantic error
-    private issues: { type: 'error' | 'warning', message: string, line: number, column: number }[] = [];
+    private issues: SemanticIssue[] = [];
 
     private programCounter: number = 1;
     private lexerLogs: LexerLog[] = []; // Store lexer logs separately
     cst: any;
 
 
-    constructor(cst: any) {
+    constructor(cst: any, programNumber?: number) {
         try {
             console.log("SemanticAnalyzer initializing with CST:", cst);
             this.cst = cst;
+    
+            // Initialize with provided program number or default to 1
+            this.programCounter = programNumber || 1;
     
             // Initialize all state fresh for each new instance
             this.ast = ASTAdapter.convert(cst);
@@ -503,7 +506,6 @@ export class SemanticAnalyzer {
             this.scopeStack = [0];
             this.symbolTable = new Map();  // Fresh symbol table
             this.issues = [];             // Fresh issues list
-            this.programCounter = 1;      // Reset program counter
             this.lexerLogs = [];          // Reset lexer logs
         } catch (error) {
             console.error("SemanticAnalyzer constructor error:", error);
@@ -520,13 +522,15 @@ export class SemanticAnalyzer {
         symbolTable: Map<string, SymbolTableEntry[]>;
         issues: SemanticIssue[];
         ast: ASTNode | null;
+        programNumber: number;
     } {
         if (!this.ast) {
             this.addError("Failed to generate AST from parser output", 0, 0);
             return {
                 symbolTable: this.symbolTable,
                 issues: this.issues,
-                ast: null
+                ast: null,
+                programNumber: this.programCounter
             };
         }
 
@@ -539,7 +543,8 @@ export class SemanticAnalyzer {
         return {
             symbolTable: this.symbolTable,
             issues: this.issues,
-            ast: this.ast
+            ast: this.ast,
+            programNumber: this.programCounter
         };
     }
 
@@ -547,12 +552,16 @@ export class SemanticAnalyzer {
      * Print the analysis results in a readable format
      */
     public printResults(): string {
-        let output = `Program 1 Abstract Syntax Tree\n`;
+        let output = '';
+        
+        // Print AST with program number
+        output += `Program ${this.programCounter} Abstract Syntax Tree\n`;
         output += '-------------------------------\n';
         output += this.printAST(this.ast);
         output += '\n';
 
-        output += `Program 1 Symbol Table\n`;
+        // Print Symbol Table with program number
+        output += `Program ${this.programCounter} Symbol Table\n`;
         output += '--------------------------------------\n';
         output += 'Name\tType\tScope\tLine\n';
         output += '-------------------------------------\n';
@@ -580,10 +589,13 @@ export class SemanticAnalyzer {
 
         output += '\nSEMANTIC ANALYZER --> ';
         if (this.issues.some(issue => issue.type === 'error')) {
-            output += 'Semantic Analysis completed with errors\n';
+            output += `Program ${this.programCounter} Semantic Analysis completed with errors\n`;
         } else {
-            output += 'Semantic Analysis completed successfully\n';
+            output += `Program ${this.programCounter} Semantic Analysis completed successfully\n`;
         }
+
+        // Increment program counter for next program
+        this.programCounter++;
 
         return output;
     }
@@ -1120,6 +1132,15 @@ export class SemanticAnalyzer {
             line,
             column
         });
+    }
+
+    // Add method to reset state for next program
+    public resetForNextProgram(): void {
+        this.currentScope = 0;
+        this.scopeStack = [0];
+        this.symbolTable.clear();
+        this.issues = [];
+        // Don't reset programCounter as it should continue incrementing
     }
 }
 
