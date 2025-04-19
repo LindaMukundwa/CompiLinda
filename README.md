@@ -1,6 +1,6 @@
 # CompiLinda 🌺
 
-This is a project aimed at making a compiler, with the current stage at a parser. This project is a work in progress and will be updated as I continue to work on it. The grammar of the language is defined as Alan++ and as such, is the basis of the compiler.
+This is a project aimed at making a compiler, with the current stage at a semantic analyzer. This project is a work in progress and will be updated as I continue to work on it. The grammar of the language is defined as Alan++ and as such, is the basis of the compiler.
 
 The first version of this compiler was made with typescript and in order to make it work locally for you, make sure to clone this repository. From there, make sure you have node installed since that is what I am using to run it on a web environment. After that, in order to run the compiler, check the installation steps:
 
@@ -11,6 +11,7 @@ This compiler is a work in progress and will eventually follow a more standard c
 - src/
   - main.ts: The lexer implementation.
   - parser.ts: The parser implementation
+  - combinedAnalyzer.ts: The semantic analyzer implementation
 
 The transpiled code is in the dist folder. The dist folder is the folder that is used to run the lexer and compiled from the src folder.**NOTE:** Please grade the main branch as this is the latest version of the compiler.
 
@@ -46,7 +47,7 @@ tsc
 
 ## Usage 👩🏾‍💻
 
-All of the source code is in the src folder. The main.ts file is the entry point of the lexer and the parser.ts is the entry point of the parser. The lexer combined with the parser is a web application that allows you to compile Alan++ code into tokens then parse and create a CST.
+All of the source code is in the src folder. The main.ts file is the entry point of the lexer and the parser.ts is the entry point of the parser. The lexer combined with the parser is a web application that allows you to compile Alan++ code into tokens then parse and create a CST. The combinedAnalyzer.ts is the semantic analyzer that produces an AST, performs type and scope checking and also a symbol table to send to code generation. 
 
 After running the commands above, you can run the compiler by opening the **index.html** file in your browser. Make sure to use Chrome for the best experience. Paste your source code into the text area and then click the "Compile" button to run the lexer and view the tokens as well as the parsing in the next tab. 
 
