@@ -594,7 +594,7 @@ export class Parser {
     private parseWhileStatement(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER -- parseWhileStatement()');
         const whileNode = this.createNode('WhileStatement');
-
+    
         // Consume while keyword
         const whileToken = this.consume(TokenType.WHILE, "Expected 'while'");
         if (whileToken) {
@@ -602,15 +602,43 @@ export class Parser {
         } else {
             return null;
         }
-
-        // Parse boolean expression
-        const boolExpr = this.parseBooleanExpression();
-        if (boolExpr) {
-            this.addChild(whileNode, boolExpr);
+    
+        // Handle special case for "while true" or "while false"
+        if (this.match(TokenType.BOOLEAN_VALUE)) {
+            const boolToken = this.consume(TokenType.BOOLEAN_VALUE, "Expected boolean value");
+            if (boolToken) {
+                const boolExpr = this.createNode('BooleanExpression');
+                this.addChild(boolExpr, this.createNode('BooleanLiteral', boolToken));
+                this.addChild(whileNode, boolExpr);
+            } else {
+                return null;
+            }
         } else {
-            return null;
+            // Handle normal case with parentheses and comparison
+            const leftParen = this.consume(TokenType.LEFT_PAREN, "Expected '(' after 'while'");
+            if (leftParen) {
+                this.addChild(whileNode, this.createNode('LeftParen', leftParen));
+            } else {
+                return null;
+            }
+    
+            // Parse boolean expression
+            const boolExpr = this.parseBooleanExpression();
+            if (boolExpr) {
+                this.addChild(whileNode, boolExpr);
+            } else {
+                return null;
+            }
+    
+            // Consume right parenthesis
+            const rightParen = this.consume(TokenType.RIGHT_PAREN, "Expected ')' to close while condition");
+            if (rightParen) {
+                this.addChild(whileNode, this.createNode('RightParen', rightParen));
+            } else {
+                return null;
+            }
         }
-
+    
         // Parse block
         const blockNode = this.parseBlock();
         if (blockNode) {
@@ -618,7 +646,7 @@ export class Parser {
         } else {
             return null;
         }
-
+    
         return whileNode;
     }
 
@@ -635,28 +663,40 @@ export class Parser {
             return null;
         }
     
-        // Consume left parenthesis
-        const leftParen = this.consume(TokenType.LEFT_PAREN, "Expected '(' after 'if'");
-        if (leftParen) {
-            this.addChild(ifNode, this.createNode('LeftParen', leftParen));
+        // Handle special case for "if true" or "if false" without parentheses
+        if (this.match(TokenType.BOOLEAN_VALUE)) {
+            const boolToken = this.consume(TokenType.BOOLEAN_VALUE, "Expected boolean value");
+            if (boolToken) {
+                const boolExpr = this.createNode('BooleanExpression');
+                this.addChild(boolExpr, this.createNode('BooleanLiteral', boolToken));
+                this.addChild(ifNode, boolExpr);
+            } else {
+                return null;
+            }
         } else {
-            return null;
-        }
+            // Handle normal case with parentheses and comparison
+            const leftParen = this.consume(TokenType.LEFT_PAREN, "Expected '(' after 'if'");
+            if (leftParen) {
+                this.addChild(ifNode, this.createNode('LeftParen', leftParen));
+            } else {
+                return null;
+            }
     
-        // Parse boolean expression
-        const boolExpr = this.parseBooleanExpression();
-        if (boolExpr) {
-            this.addChild(ifNode, boolExpr);
-        } else {
-            return null;
-        }
+            // Parse boolean expression
+            const boolExpr = this.parseBooleanExpression();
+            if (boolExpr) {
+                this.addChild(ifNode, boolExpr);
+            } else {
+                return null;
+            }
     
-        // Consume right parenthesis
-        const rightParen = this.consume(TokenType.RIGHT_PAREN, "Expected ')' to close if condition");
-        if (rightParen) {
-            this.addChild(ifNode, this.createNode('RightParen', rightParen));
-        } else {
-            return null;
+            // Consume right parenthesis
+            const rightParen = this.consume(TokenType.RIGHT_PAREN, "Expected ')' to close if condition");
+            if (rightParen) {
+                this.addChild(ifNode, this.createNode('RightParen', rightParen));
+            } else {
+                return null;
+            }
         }
     
         // Parse then block
