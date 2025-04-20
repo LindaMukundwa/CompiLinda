@@ -626,7 +626,7 @@ export class Parser {
     private parseIfStatement(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER -- parseIfStatement()');
         const ifNode = this.createNode('IfStatement');
-
+    
         // Consume if keyword
         const ifToken = this.consume(TokenType.IF, "Expected 'if'");
         if (ifToken) {
@@ -634,7 +634,15 @@ export class Parser {
         } else {
             return null;
         }
-
+    
+        // Consume left parenthesis
+        const leftParen = this.consume(TokenType.LEFT_PAREN, "Expected '(' after 'if'");
+        if (leftParen) {
+            this.addChild(ifNode, this.createNode('LeftParen', leftParen));
+        } else {
+            return null;
+        }
+    
         // Parse boolean expression
         const boolExpr = this.parseBooleanExpression();
         if (boolExpr) {
@@ -642,7 +650,15 @@ export class Parser {
         } else {
             return null;
         }
-
+    
+        // Consume right parenthesis
+        const rightParen = this.consume(TokenType.RIGHT_PAREN, "Expected ')' to close if condition");
+        if (rightParen) {
+            this.addChild(ifNode, this.createNode('RightParen', rightParen));
+        } else {
+            return null;
+        }
+    
         // Parse then block
         const thenBlock = this.parseBlock();
         if (thenBlock) {
@@ -650,14 +666,14 @@ export class Parser {
         } else {
             return null;
         }
-
+    
         // Parse optional else part
         if (this.match(TokenType.ELSE)) {
             const elseToken = this.consume(TokenType.ELSE, "");
             if (elseToken) {
                 const elseNode = this.createNode('ElseKeyword', elseToken);
                 this.addChild(ifNode, elseNode);
-
+    
                 // Parse else block
                 const elseBlock = this.parseBlock();
                 if (elseBlock) {
@@ -669,7 +685,7 @@ export class Parser {
                 return null;
             }
         }
-
+    
         return ifNode;
     }
 
@@ -677,7 +693,7 @@ export class Parser {
     private parseBooleanExpression(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER -- parseBoolean()');
         const boolNode = this.createNode('BooleanExpression');
-
+    
         // Parse left expression
         const leftExpr = this.parseExpression();
         if (leftExpr) {
@@ -685,7 +701,7 @@ export class Parser {
         } else {
             return null;
         }
-
+    
         // Parse comparison operator
         if (this.match(TokenType.EQUALS)) {
             const eqToken = this.consume(TokenType.EQUALS, "");
@@ -705,7 +721,7 @@ export class Parser {
             this.handleError("Expected comparison operator (== or !=)", this.currentToken());
             return null;
         }
-
+    
         // Parse right expression
         const rightExpr = this.parseExpression();
         if (rightExpr) {
@@ -713,7 +729,7 @@ export class Parser {
         } else {
             return null;
         }
-
+    
         return boolNode;
     }
 
