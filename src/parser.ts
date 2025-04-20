@@ -812,25 +812,33 @@ export class Parser {
     private parseTerm(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER -- parseTerm()');
         const current = this.currentToken();
-
+    
         if (this.match(TokenType.DIGIT)) {
-            const digitToken = this.consume(TokenType.DIGIT, "");
+            const digitToken = this.consume(TokenType.DIGIT, "Expected digit");
             if (digitToken) {
                 return this.createNode('IntLiteral', digitToken);
             } else {
                 return null;
             }
         } else if (this.match(TokenType.IDENTIFIER)) {
-            const identToken = this.consume(TokenType.IDENTIFIER, "");
+            const identToken = this.consume(TokenType.IDENTIFIER, "Expected identifier");
             if (identToken) {
                 return this.createNode('Identifier', identToken);
             } else {
                 return null;
             }
         } else if (this.match(TokenType.BOOLEAN_VALUE)) {
-            const boolToken = this.consume(TokenType.BOOLEAN_VALUE, "");
+            const boolToken = this.consume(TokenType.BOOLEAN_VALUE, "Expected boolean value");
             if (boolToken) {
                 return this.createNode('BooleanLiteral', boolToken);
+            } else {
+                return null;
+            }
+        } else if (this.match(TokenType.QUOTE)) {
+            // Handle string literals
+            const stringExpr = this.parseStringExpression();
+            if (stringExpr) {
+                return stringExpr;
             } else {
                 return null;
             }
