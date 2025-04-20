@@ -418,7 +418,7 @@ export class Parser {
     private parsePrintStatement(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER -- parsePrintStatement()');
         const printNode = this.createNode('PrintStatement');
-
+    
         // Consume print keyword
         const printToken = this.consume(TokenType.PRINT, "Expected 'print'");
         if (printToken) {
@@ -426,7 +426,7 @@ export class Parser {
         } else {
             return null;
         }
-
+    
         // Consume left parenthesis
         this.addLog('DEBUG', 'PARSER -- Parsing expecting LPAREN');
         const leftParen = this.consume(TokenType.LEFT_PAREN, "Expected '(' after 'print'");
@@ -436,13 +436,20 @@ export class Parser {
         } else {
             return null;
         }
-
-        // Parse expression
-        //this.addLog('DEBUG', 'PARSER -- Parsing Attempting to parse expression');
+    
+        // Parse expression, which could now be a parenthesized expression as handled by parseTerm()
         if (this.match(TokenType.QUOTE)) {
             const stringNode = this.parseStringExpression();
             if (stringNode) {
                 this.addChild(printNode, stringNode);
+            } else {
+                return null;
+            }
+        } else if (this.match(TokenType.LEFT_PAREN)) {
+            // Special case for parenthesized boolean expressions in print statements
+            const parenExpr = this.parseTerm(); // This will now handle the parenthesized expression
+            if (parenExpr) {
+                this.addChild(printNode, parenExpr);
             } else {
                 return null;
             }
@@ -454,7 +461,7 @@ export class Parser {
                 return null;
             }
         }
-
+    
         // Consume right parenthesis
         this.addLog('DEBUG', 'PARSER -- Parsing Expecting RPAREN');
         const rightParen = this.consume(TokenType.RIGHT_PAREN, "Expected ')' to close print statement");
@@ -464,7 +471,7 @@ export class Parser {
         } else {
             return null;
         }
-
+    
         this.addLog('DEBUG', 'PARSER -- Parsing PrintStatement parsed successfully');
         return printNode;
     }
@@ -813,7 +820,30 @@ export class Parser {
         this.addLog('DEBUG', 'PARSER -- parseTerm()');
         const current = this.currentToken();
     
-        if (this.match(TokenType.DIGIT)) {
+        if (this.match(TokenType.LEFT_PAREN)) {
+            // Handle parenthesized expressions
+            this.addLog('DEBUG', 'PARSER -- Parsing parenthesized expression');
+            
+            // Consume opening parenthesis
+            const leftParen = this.consume(TokenType.LEFT_PAREN, "");
+            if (!leftParen) return null;
+            
+            // Parse the expression inside parentheses
+            const expr = this.parseBooleanExpression(); // This might be a boolean expression
+            if (!expr) return null;
+            
+            // Consume closing parenthesis
+            const rightParen = this.consume(TokenType.RIGHT_PAREN, "Expected ')' to close expression");
+            if (!rightParen) return null;
+            
+            // Create a node for the parenthesized expression
+            const parenExpr = this.createNode('ParenthesizedExpression');
+            this.addChild(parenExpr, this.createNode('LeftParen', leftParen));
+            this.addChild(parenExpr, expr);
+            this.addChild(parenExpr, this.createNode('RightParen', rightParen));
+            
+            return parenExpr;
+        } else if (this.match(TokenType.DIGIT)) {
             const digitToken = this.consume(TokenType.DIGIT, "Expected digit");
             if (digitToken) {
                 return this.createNode('IntLiteral', digitToken);
