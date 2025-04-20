@@ -350,7 +350,7 @@
                 symbolTableOutput.textContent = allResults || "No successful compilations";
                 semanticIssuesOutput.textContent = allIssues.length > 0
                     ? allIssues.map(i => `Program ${i.program}: ${i.type.toUpperCase()} - ${i.message}`).join('\n')
-                    : "No issues found";
+                    : "No issues found :)";
 
                 // Update status message
                 if (allIssues.some(i => i.type === 'error')) {

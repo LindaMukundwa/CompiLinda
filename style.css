@@ -39,6 +39,16 @@ button:hover {
     display: none;
 }
 
+div#errorMessage.parse-success.semantic-success {
+    color: green;
+    margin: 10px 0;
+    padding: 10px;
+    border: 1px solid #ff0000;
+    border-radius: 4px;
+    background-color: #fff0f0;
+    display: none;
+}
+
 /* Style for log messages */
 .log-error {
     color: red;
