@@ -773,51 +773,37 @@ export class Parser {
         return boolNode;
     }
 
-    // Parse expression with more detailed logginf
+    // Parse expression with more detailed logging
     private parseExpression(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER -- parseExpression()');
         const exprNode = this.createNode('Expression');
-        const current = this.currentToken();
-    
-        //this.addLog('DEBUG', `PARSER -- Parsing Current token: ${current.type} [${current.value}]`);
-    
-        if (this.match(TokenType.LEFT_PAREN)) {
-            // Handle parenthesized expressions (not implemented in your code)
-        } else if (this.match(TokenType.BOOLEAN_VALUE)) {
-            const boolToken = this.consume(TokenType.BOOLEAN_VALUE, "Expected boolean value");
-            if (boolToken) {
-                this.addChild(exprNode, this.createNode('BooleanLiteral', boolToken));
-            } else {
-                return null;
-            }
-        } else if (this.match(TokenType.DIGIT)) {
-            // Handle integer literal - this part is missing proper implementation
-            const digitToken = this.consume(TokenType.DIGIT, "Expected digit");
-            if (digitToken) {
-                this.addChild(exprNode, this.createNode('IntLiteral', digitToken));
-            } else {
-                return null;
-            }
-        } else if (this.match(TokenType.IDENTIFIER)) {
-            const identToken = this.consume(TokenType.IDENTIFIER, "Expected identifier");
-            if (identToken) {
-                this.addChild(exprNode, this.createNode('Identifier', identToken));
-            } else {
-                return null;
-            }
-        } else if (this.match(TokenType.QUOTE)) {
-            // Handle string expression
-            const stringExpr = this.parseStringExpression();
-            if (stringExpr) {
-                this.addChild(exprNode, stringExpr);
-            } else {
-                return null;
-            }
-        } else {
-            this.handleError(`Expected expression, got ${current.value}`, current);
+        
+        // Parse first term
+        const firstTerm = this.parseTerm();
+        if (!firstTerm) {
             return null;
         }
-    
+        this.addChild(exprNode, firstTerm);
+        
+        // Check for arithmetic operator
+        if (this.match(TokenType.INT_OP)) {  // Assuming INT_OP is your token type for '+', '-', etc.
+            const opToken = this.consume(TokenType.INT_OP, "Expected arithmetic operator");
+            if (opToken) {
+                // Add the operator to the expression
+                this.addChild(exprNode, this.createNode('Operator', opToken));
+                
+                // Parse the second term
+                const secondTerm = this.parseTerm();
+                if (secondTerm) {
+                    this.addChild(exprNode, secondTerm);
+                } else {
+                    return null;
+                }
+            } else {
+                return null;
+            }
+        }
+        
         this.addLog('DEBUG', 'PARSER -- Parsing Expression parsed successfully');
         return exprNode;
     }
