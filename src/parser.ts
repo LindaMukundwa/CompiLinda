@@ -722,33 +722,46 @@ export class Parser {
         this.addLog('DEBUG', 'PARSER -- parseExpression()');
         const exprNode = this.createNode('Expression');
         const current = this.currentToken();
-
+    
         //this.addLog('DEBUG', `PARSER -- Parsing Current token: ${current.type} [${current.value}]`);
-
-        // Special handling for parenthesized expressions or boolean literals
-        if (this.match(TokenType.LEFT_PAREN) || this.match(TokenType.BOOLEAN_VALUE)) {
-            this.addLog('DEBUG', 'PARSER -- Parsing Found LPAREN or BOOLEAN_VAL');
-            // Handle specific expression type here...
+    
+        if (this.match(TokenType.LEFT_PAREN)) {
+            // Handle parenthesized expressions (not implemented in your code)
+        } else if (this.match(TokenType.BOOLEAN_VALUE)) {
+            const boolToken = this.consume(TokenType.BOOLEAN_VALUE, "Expected boolean value");
+            if (boolToken) {
+                this.addChild(exprNode, this.createNode('BooleanLiteral', boolToken));
+            } else {
+                return null;
+            }
         } else if (this.match(TokenType.DIGIT)) {
-            this.addLog('DEBUG', 'PARSER -- Parsing Found DIGIT');
-            // Handle integer expression...
+            // Handle integer literal - this part is missing proper implementation
+            const digitToken = this.consume(TokenType.DIGIT, "Expected digit");
+            if (digitToken) {
+                this.addChild(exprNode, this.createNode('IntLiteral', digitToken));
+            } else {
+                return null;
+            }
         } else if (this.match(TokenType.IDENTIFIER)) {
-            this.addLog('DEBUG', 'PARSER -- Parsing Found ID');
-            const identToken = this.consume(TokenType.IDENTIFIER, "");
+            const identToken = this.consume(TokenType.IDENTIFIER, "Expected identifier");
             if (identToken) {
-                this.addLog('DEBUG', 'PARSER -- Parsing ID parsed successfully');
                 this.addChild(exprNode, this.createNode('Identifier', identToken));
             } else {
                 return null;
             }
         } else if (this.match(TokenType.QUOTE)) {
-            this.addLog('DEBUG', 'PARSER -- Parsing found QUOTE');
-            // Handle string expression...
+            // Handle string expression
+            const stringExpr = this.parseStringExpression();
+            if (stringExpr) {
+                this.addChild(exprNode, stringExpr);
+            } else {
+                return null;
+            }
         } else {
             this.handleError(`Expected expression, got ${current.value}`, current);
             return null;
         }
-
+    
         this.addLog('DEBUG', 'PARSER -- Parsing Expression parsed successfully');
         return exprNode;
     }

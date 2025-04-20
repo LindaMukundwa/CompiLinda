@@ -684,13 +684,3 @@ declare global {
 window.Lexer = Lexer;
 
 (window as any).Lexer = Lexer;
-
-// In your main code where you process multiple programs
-let programCounter = 1;
-programs.forEach(program => {
-    const analyzer = new SemanticAnalyzer(program.cst, programCounter);
-    const results = analyzer.analyze();
-    console.log(analyzer.printResults());
-    programCounter++;
-    analyzer.resetForNextProgram();
-});
