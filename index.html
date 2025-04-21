@@ -181,196 +181,245 @@
         // updated compile function to not check for lexical errors since parsing handles that problem
         // Complete compilation function that performs lexing, parsing and semantic analysis
         function compile() {
-            // Clear outputs first
-            const errorDiv = document.getElementById('errorMessage');
-            const lexerOutputDiv = document.getElementById('lexerOutput');
-            const parseStatusDiv = document.getElementById('parseStatus');
-            const cstDisplayDiv = document.getElementById('cstDisplay');
-            const semanticStatusDiv = document.getElementById('semanticStatus');
-            const symbolTableOutput = document.getElementById('symbolTableOutput');
-            const semanticIssuesOutput = document.getElementById('semanticIssuesOutput');
+        // Clear outputs first
+        const errorDiv = document.getElementById('errorMessage');
+        const lexerOutputDiv = document.getElementById('lexerOutput');
+        const parseStatusDiv = document.getElementById('parseStatus');
+        const cstDisplayDiv = document.getElementById('cstDisplay');
+        const semanticStatusDiv = document.getElementById('semanticStatus');
+        const symbolTableOutput = document.getElementById('symbolTableOutput');
+        const semanticIssuesOutput = document.getElementById('semanticIssuesOutput');
 
-            // Clear previous outputs
-            errorDiv.style.display = 'none';
-            errorDiv.textContent = '';
-            lexerOutputDiv.innerHTML = '';
-            parseStatusDiv.innerHTML = '';
-            cstDisplayDiv.innerHTML = '';
-            semanticStatusDiv.innerHTML = '';
-            symbolTableOutput.innerHTML = '';
-            semanticIssuesOutput.innerHTML = '';
+        // Clear previous outputs
+        errorDiv.style.display = 'none';
+        errorDiv.textContent = '';
+        lexerOutputDiv.innerHTML = '';
+        parseStatusDiv.innerHTML = '';
+        cstDisplayDiv.innerHTML = '';
+        semanticStatusDiv.innerHTML = '';
+        symbolTableOutput.innerHTML = '';
+        semanticIssuesOutput.innerHTML = '';
 
-            try {
-                // Check dependencies first
-                if (!checkDependencies()) return;
+        try {
+            // Check dependencies first
+            if (!checkDependencies()) return;
 
-                const sourceCode = document.getElementById('sourceCode').value;
-                const programSources = sourceCode.split(/\$+/).map(p => p.trim()).filter(p => p);
+            const sourceCode = document.getElementById('sourceCode').value;
+            const programSources = sourceCode.split(/\$+/).map(p => p.trim()).filter(p => p);
 
-                if (programSources.length === 0) {
-                    errorDiv.textContent = 'No programs found (must be separated by $)';
-                    errorDiv.style.display = 'block';
-                    return;
-                }
+            if (programSources.length === 0) {
+                errorDiv.textContent = 'No programs found (must be separated by $)';
+                errorDiv.style.display = 'block';
+                return;
+            }
 
-                let allResults = '';
-                let allIssues = [];
-                let successfulPrograms = 0;
+            let allResults = '';
+            let allIssues = [];
+            let successfulPrograms = 0;
 
-                // Clear previous outputs and create headers
-                lexerOutputDiv.innerHTML = '<h3>Lexer Output for All Programs</h3>';
-                parseStatusDiv.innerHTML = '<h3>Parser Output for All Programs</h3>';
-                cstDisplayDiv.innerHTML = '<h3>Concrete Syntax Trees</h3>';
-                semanticStatusDiv.innerHTML = '<h3>Semantic Analysis Results</h3>';
+            // Clear previous outputs and create headers
+            lexerOutputDiv.innerHTML = '<h3>Lexer Output for All Programs</h3>';
+            parseStatusDiv.innerHTML = '<h3>Parser Output for All Programs</h3>';
+            cstDisplayDiv.innerHTML = '<h3>Concrete Syntax Trees</h3>';
+            semanticStatusDiv.innerHTML = '<h3>Semantic Analysis Results</h3>';
+            symbolTableOutput.innerHTML = '<h3>Symbol Tables</h3>';
+            semanticIssuesOutput.innerHTML = '<h3></h3>';
 
-                programSources.forEach((programSource, index) => {
-                    const programNum = index + 1;
-                    try {
-                        // Add program header
-                        const programHeader = document.createElement('h4');
-                        programHeader.textContent = `Program ${programNum}`;
+            programSources.forEach((programSource, index) => {
+                const programNum = index + 1;
+                try {
+                    // Add program header
+                    const programHeader = document.createElement('h4');
+                    programHeader.textContent = `Program ${programNum}`;
 
-                        // LEXER PROCESSING
-                        const lexer = new Lexer(programSource);
-                        const lexResult = lexer.tokenize();
+                    // LEXER PROCESSING
+                    const lexer = new Lexer(programSource);
+                    const lexResult = lexer.tokenize();
 
-                        // Display lexer output for this program
-                        const lexerProgramHeader = programHeader.cloneNode(true);
-                        lexerOutputDiv.appendChild(lexerProgramHeader);
-                        lexResult.logs.forEach(log => {
-                            const logElement = document.createElement('div');
-                            logElement.className = `log-${log.level.toLowerCase()}`;
-                            logElement.textContent = log.message;
-                            lexerOutputDiv.appendChild(logElement);
+                    // Display lexer output for this program
+                    const lexerProgramHeader = programHeader.cloneNode(true);
+                    lexerOutputDiv.appendChild(lexerProgramHeader);
+                    lexResult.logs.forEach(log => {
+                        const logElement = document.createElement('div');
+                        logElement.className = `log-${log.level.toLowerCase()}`;
+                        logElement.textContent = log.message;
+                        lexerOutputDiv.appendChild(logElement);
+                    });
+
+                    // PARSER PROCESSING
+                    const parser = new Parser(lexResult.tokens);
+                    const parseResult = parser.parse();
+
+                    // Display parser output for this program
+                    const parserProgramHeader = programHeader.cloneNode(true);
+                    parseStatusDiv.appendChild(parserProgramHeader);
+                    parseResult.logs.forEach(log => {
+                        const logElement = document.createElement('div');
+                        logElement.className = `log-${log.level.toLowerCase()}`;
+                        logElement.textContent = log.message;
+                        parseStatusDiv.appendChild(logElement);
+                    });
+
+                    // Display CST if available
+                    if (parseResult.ast) {
+                        const cstProgramHeader = programHeader.cloneNode(true);
+                        cstDisplayDiv.appendChild(cstProgramHeader);
+                        const cstOutput = parser.printCST(parseResult.ast);
+                        const cstElement = document.createElement('pre');
+                        cstElement.textContent = cstOutput;
+                        cstDisplayDiv.appendChild(cstElement);
+                    }
+
+                    // SEMANTIC ANALYSIS
+                    if (parseResult.ast && !parseResult.logs.some(log => log.level === 'ERROR')) {
+                        const semanticAnalyzer = new SemanticAnalyzer(parseResult.ast);
+                        const semanticResult = semanticAnalyzer.analyze();
+
+                        // Create program section for semantic results
+                        const programSection = document.createElement('div');
+                        programSection.className = 'program-section';
+                        
+                        // AST Display
+                        const astHeader = document.createElement('h4');
+                        astHeader.textContent = `Program ${programNum} AST`;
+                        programSection.appendChild(astHeader);
+                        
+                        const astPre = document.createElement('pre');
+                        astPre.textContent = semanticAnalyzer.printAST(semanticResult.ast);
+                        programSection.appendChild(astPre);
+                        
+                        // Symbol Table Display
+                        const symbolHeader = document.createElement('h4');
+                        symbolHeader.textContent = `Program ${programNum} Symbol Table`;
+                        programSection.appendChild(symbolHeader);
+                        
+                        const symbolPre = document.createElement('pre');
+                        let symbolTableText = 'Name\tType\tInit?\tUsed?\tScope\tLine\n';
+                        symbolTableText += '---------------------------------------------\n';
+                        
+                        // Process symbol table entries
+                        const entries = [];
+                        semanticResult.symbolTable.forEach((symbolEntries, name) => {
+                            symbolEntries.forEach(entry => entries.push({ ...entry, name }));
                         });
-
-                        // PARSER PROCESSING
-                        const parser = new Parser(lexResult.tokens);
-                        const parseResult = parser.parse();
-
-                        // Display parser output for this program
-                        const parserProgramHeader = programHeader.cloneNode(true);
-                        parseStatusDiv.appendChild(parserProgramHeader);
-                        parseResult.logs.forEach(log => {
-                            const logElement = document.createElement('div');
-                            logElement.className = `log-${log.level.toLowerCase()}`;
-                            logElement.textContent = log.message;
-                            parseStatusDiv.appendChild(logElement);
-                        });
-
-                        // Display CST if available
-                        if (parseResult.ast) {
-                            const cstProgramHeader = programHeader.cloneNode(true);
-                            cstDisplayDiv.appendChild(cstProgramHeader);
-                            const cstOutput = parser.printCST(parseResult.ast);
-                            const cstElement = document.createElement('pre');
-                            cstElement.textContent = cstOutput;
-                            cstDisplayDiv.appendChild(cstElement);
-                        }
-
-                        // SEMANTIC ANALYSIS
-                        if (parseResult.ast && !parseResult.logs.some(log => log.level === 'ERROR')) {
-                            const semanticAnalyzer = new SemanticAnalyzer(parseResult.ast);
-                            const semanticResult = semanticAnalyzer.analyze();
-
-                            // Accumulate results
-                            allResults += `Program ${programNum} Abstract Syntax Tree\n`;
-                            allResults += '-------------------------------\n';
-                            allResults += semanticAnalyzer.printAST(semanticResult.ast);
-                            allResults += '\n\n';
-
-                            allResults += `Program ${programNum} Symbol Table\n`;
-                            allResults += '--------------------------------------\n';
-                            allResults += 'Name\tType\tScope\tLine\n';
-                            allResults += '-------------------------------------\n';
-
-                            // Process symbol table
-                            const entries = [];
-                            semanticResult.symbolTable.forEach((symbolEntries, name) => {
-                                symbolEntries.forEach(entry => entries.push({ ...entry, name }));
+                        
+                        // Sort and display entries
+                        entries.sort((a, b) => a.scope - b.scope || a.line - b.line)
+                            .forEach(entry => {
+                                symbolTableText += `${entry.name}\t${entry.type}\t${entry.isInitialized}\t${entry.isUsed}\t${entry.scope}\t${entry.line}\n`;
                             });
+                        
+                        symbolPre.textContent = symbolTableText;
+                        programSection.appendChild(symbolPre);
+                        
+                        // Add to main output
+                        symbolTableOutput.appendChild(programSection);
 
-                            entries.sort((a, b) => a.scope - b.scope || a.line - b.line)
-                                .forEach(entry => {
-                                    allResults += `${entry.name}\t${entry.type}\t${entry.scope}\t${entry.line}\n`;
-                                });
+                        successfulPrograms++;
 
-                            successfulPrograms++;
-
-                            // Collect semantic issues
+                        // Display semantic issues with color coding
+                        if (semanticResult.issues.length > 0) {
+                            const issuesHeader = document.createElement('h4');
+                            issuesHeader.textContent = `Program ${programNum} Issues`;
+                            semanticIssuesOutput.appendChild(issuesHeader);
+                            
                             semanticResult.issues.forEach(issue => {
+                                const issueElement = document.createElement('div');
+                                issueElement.className = `semantic-${issue.type}`;
+                                issueElement.textContent = `${issue.type.toUpperCase()}: ${issue.message} (Line ${issue.line}, Column ${issue.column})`;
+                                semanticIssuesOutput.appendChild(issueElement);
+                                
+                                // Add to all issues array
                                 allIssues.push({
                                     program: programNum,
                                     type: issue.type,
-                                    message: `Semantic: ${issue.message}`,
+                                    message: issue.message,
                                     line: issue.line,
                                     column: issue.column
                                 });
                             });
                         }
 
-                        // Collect lexer/parser errors
-                        lexResult.logs.forEach(log => {
-                            if (log.level === 'ERROR') {
-                                allIssues.push({
-                                    program: programNum,
-                                    type: 'error',
-                                    message: `Lexer: ${log.message}`,
-                                    line: log.line,
-                                    column: log.column
-                                });
-                            }
-                        });
-
-                        parseResult.logs.forEach(log => {
-                            if (log.level === 'ERROR') {
-                                allIssues.push({
-                                    program: programNum,
-                                    type: 'error',
-                                    message: `Parser: ${log.message}`,
-                                    line: log.line,
-                                    column: log.column
-                                });
-                            }
-                        });
-
-                    } catch (error) {
-                        console.error(`Program ${programNum} failed:`, error);
-                        allIssues.push({
-                            program: programNum,
-                            type: 'error',
-                            message: `Processing failed: ${error.message}`,
-                            line: 0,
-                            column: 0
-                        });
+                        // Add success message if no issues
+                        if (semanticResult.issues.length === 0) {
+                            const successElement = document.createElement('div');
+                            successElement.className = 'semantic-success';
+                            successElement.textContent = `Program ${programNum}: No semantic issues found`;
+                            semanticIssuesOutput.appendChild(successElement);
+                        }
                     }
-                });
 
-                // Display all results
-                symbolTableOutput.textContent = allResults || "No successful compilations";
-                semanticIssuesOutput.textContent = allIssues.length > 0
-                    ? allIssues.map(i => `Program ${i.program}: ${i.type.toUpperCase()} - ${i.message}`).join('\n')
-                    : "No issues found :)";
+                    // Collect lexer/parser errors
+                    lexResult.logs.forEach(log => {
+                        if (log.level === 'ERROR') {
+                            const errorElement = document.createElement('div');
+                            errorElement.className = 'semantic-error';
+                            errorElement.textContent = `Program ${programNum}: Lexer Error - ${log.message} (Line ${log.line}, Column ${log.column})`;
+                            semanticIssuesOutput.appendChild(errorElement);
+                            
+                            allIssues.push({
+                                program: programNum,
+                                type: 'error',
+                                message: `Lexer: ${log.message}`,
+                                line: log.line,
+                                column: log.column
+                            });
+                        }
+                    });
 
-                // Update status message
-                if (allIssues.some(i => i.type === 'error')) {
-                    errorDiv.textContent = `Compilation completed with errors (${successfulPrograms}/${programSources.length} programs succeeded)`;
-                    errorDiv.className = 'error';
-                } else {
-                    errorDiv.textContent = `All programs compiled successfully (${programSources.length} programs)`;
-                    errorDiv.className = 'success';
+                    parseResult.logs.forEach(log => {
+                        if (log.level === 'ERROR') {
+                            const errorElement = document.createElement('div');
+                            errorElement.className = 'semantic-error';
+                            errorElement.textContent = `Program ${programNum}: Parser Error - ${log.message} (Line ${log.line}, Column ${log.column})`;
+                            semanticIssuesOutput.appendChild(errorElement);
+                            
+                            allIssues.push({
+                                program: programNum,
+                                type: 'error',
+                                message: `Parser: ${log.message}`,
+                                line: log.line,
+                                column: log.column
+                            });
+                        }
+                    });
+
+                } catch (error) {
+                    console.error(`Program ${programNum} failed:`, error);
+                    const errorElement = document.createElement('div');
+                    errorElement.className = 'semantic-error';
+                    errorElement.textContent = `Program ${programNum}: Processing Error - ${error.message}`;
+                    semanticIssuesOutput.appendChild(errorElement);
+                    
+                    allIssues.push({
+                        program: programNum,
+                        type: 'error',
+                        message: `Processing failed: ${error.message}`,
+                        line: 0,
+                        column: 0
+                    });
                 }
-                errorDiv.style.display = 'block';
+            });
 
-                // Show semantic analyzer tab by default
-                showTab('semanticAnalyzer');
-
-            } catch (globalError) {
-                console.error("Global error:", globalError);
-                errorDiv.textContent = `System error: ${globalError.message}`;
-                errorDiv.style.display = 'block';
+            // Update status message
+            if (allIssues.some(i => i.type === 'error')) {
+                errorDiv.textContent = `Compilation completed with errors (${successfulPrograms}/${programSources.length} programs succeeded)`;
+                errorDiv.className = 'error';
+            } else {
+                errorDiv.textContent = `All programs compiled successfully (${programSources.length} programs)`;
+                errorDiv.className = 'success';
             }
+            errorDiv.style.display = 'block';
+
+            // Show semantic analyzer tab by default
+            showTab('semanticAnalyzer');
+
+        } catch (globalError) {
+            console.error("Global error:", globalError);
+            errorDiv.textContent = `System error: ${globalError.message}`;
+            errorDiv.style.display = 'block';
         }
+    }
     </script>
 </body>
 

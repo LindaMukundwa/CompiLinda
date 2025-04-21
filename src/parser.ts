@@ -323,7 +323,7 @@ export class Parser {
         if (!blockNode.children.some(child => child.name === 'StatementList')) {
             this.addChild(blockNode, this.createNode('StatementList'));
         }
-        
+
         return blockNode;
     }
 
@@ -418,7 +418,7 @@ export class Parser {
     private parsePrintStatement(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER -- parsePrintStatement()');
         const printNode = this.createNode('PrintStatement');
-    
+
         // Consume print keyword
         const printToken = this.consume(TokenType.PRINT, "Expected 'print'");
         if (printToken) {
@@ -426,7 +426,7 @@ export class Parser {
         } else {
             return null;
         }
-    
+
         // Consume left parenthesis
         this.addLog('DEBUG', 'PARSER -- Parsing expecting LPAREN');
         const leftParen = this.consume(TokenType.LEFT_PAREN, "Expected '(' after 'print'");
@@ -436,24 +436,18 @@ export class Parser {
         } else {
             return null;
         }
-    
-        // Parse expression, which could now be a parenthesized expression as handled by parseTerm()
+
+        // Handle different types of expressions in print
         if (this.match(TokenType.QUOTE)) {
-            const stringNode = this.parseStringExpression();
-            if (stringNode) {
-                this.addChild(printNode, stringNode);
-            } else {
-                return null;
-            }
-        } else if (this.match(TokenType.LEFT_PAREN)) {
-            // Special case for parenthesized boolean expressions in print statements
-            const parenExpr = this.parseTerm(); // This will now handle the parenthesized expression
-            if (parenExpr) {
-                this.addChild(printNode, parenExpr);
+            // Handle string literals
+            const stringExpr = this.parseStringExpression();
+            if (stringExpr) {
+                this.addChild(printNode, stringExpr);
             } else {
                 return null;
             }
         } else {
+            // Handle other expressions
             const exprNode = this.parseExpression();
             if (exprNode) {
                 this.addChild(printNode, exprNode);
@@ -461,7 +455,7 @@ export class Parser {
                 return null;
             }
         }
-    
+
         // Consume right parenthesis
         this.addLog('DEBUG', 'PARSER -- Parsing Expecting RPAREN');
         const rightParen = this.consume(TokenType.RIGHT_PAREN, "Expected ')' to close print statement");
@@ -471,7 +465,7 @@ export class Parser {
         } else {
             return null;
         }
-    
+
         this.addLog('DEBUG', 'PARSER -- Parsing PrintStatement parsed successfully');
         return printNode;
     }
@@ -601,7 +595,7 @@ export class Parser {
     private parseWhileStatement(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER -- parseWhileStatement()');
         const whileNode = this.createNode('WhileStatement');
-    
+
         // Consume while keyword
         const whileToken = this.consume(TokenType.WHILE, "Expected 'while'");
         if (whileToken) {
@@ -609,8 +603,8 @@ export class Parser {
         } else {
             return null;
         }
-    
-        // Handle special case for "while true" or "while false"
+
+        // Handle direct boolean values like "while true"
         if (this.match(TokenType.BOOLEAN_VALUE)) {
             const boolToken = this.consume(TokenType.BOOLEAN_VALUE, "Expected boolean value");
             if (boolToken) {
@@ -621,14 +615,14 @@ export class Parser {
                 return null;
             }
         } else {
-            // Handle normal case with parentheses and comparison
+            // Regular case with parentheses
             const leftParen = this.consume(TokenType.LEFT_PAREN, "Expected '(' after 'while'");
             if (leftParen) {
                 this.addChild(whileNode, this.createNode('LeftParen', leftParen));
             } else {
                 return null;
             }
-    
+
             // Parse boolean expression
             const boolExpr = this.parseBooleanExpression();
             if (boolExpr) {
@@ -636,7 +630,7 @@ export class Parser {
             } else {
                 return null;
             }
-    
+
             // Consume right parenthesis
             const rightParen = this.consume(TokenType.RIGHT_PAREN, "Expected ')' to close while condition");
             if (rightParen) {
@@ -645,7 +639,7 @@ export class Parser {
                 return null;
             }
         }
-    
+
         // Parse block
         const blockNode = this.parseBlock();
         if (blockNode) {
@@ -653,7 +647,7 @@ export class Parser {
         } else {
             return null;
         }
-    
+
         return whileNode;
     }
 
@@ -661,7 +655,7 @@ export class Parser {
     private parseIfStatement(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER -- parseIfStatement()');
         const ifNode = this.createNode('IfStatement');
-    
+
         // Consume if keyword
         const ifToken = this.consume(TokenType.IF, "Expected 'if'");
         if (ifToken) {
@@ -669,9 +663,10 @@ export class Parser {
         } else {
             return null;
         }
-    
-        // Handle special case for "if true" or "if false" without parentheses
+
+        // Handle both cases: with and without parentheses
         if (this.match(TokenType.BOOLEAN_VALUE)) {
+            // Direct boolean value without parentheses
             const boolToken = this.consume(TokenType.BOOLEAN_VALUE, "Expected boolean value");
             if (boolToken) {
                 const boolExpr = this.createNode('BooleanExpression');
@@ -681,14 +676,14 @@ export class Parser {
                 return null;
             }
         } else {
-            // Handle normal case with parentheses and comparison
+            // Regular case with parentheses
             const leftParen = this.consume(TokenType.LEFT_PAREN, "Expected '(' after 'if'");
             if (leftParen) {
                 this.addChild(ifNode, this.createNode('LeftParen', leftParen));
             } else {
                 return null;
             }
-    
+
             // Parse boolean expression
             const boolExpr = this.parseBooleanExpression();
             if (boolExpr) {
@@ -696,7 +691,7 @@ export class Parser {
             } else {
                 return null;
             }
-    
+
             // Consume right parenthesis
             const rightParen = this.consume(TokenType.RIGHT_PAREN, "Expected ')' to close if condition");
             if (rightParen) {
@@ -705,7 +700,7 @@ export class Parser {
                 return null;
             }
         }
-    
+
         // Parse then block
         const thenBlock = this.parseBlock();
         if (thenBlock) {
@@ -713,14 +708,14 @@ export class Parser {
         } else {
             return null;
         }
-    
+
         // Parse optional else part
         if (this.match(TokenType.ELSE)) {
             const elseToken = this.consume(TokenType.ELSE, "");
             if (elseToken) {
                 const elseNode = this.createNode('ElseKeyword', elseToken);
                 this.addChild(ifNode, elseNode);
-    
+
                 // Parse else block
                 const elseBlock = this.parseBlock();
                 if (elseBlock) {
@@ -732,7 +727,7 @@ export class Parser {
                 return null;
             }
         }
-    
+
         return ifNode;
     }
 
@@ -740,17 +735,118 @@ export class Parser {
     private parseBooleanExpression(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER -- parseBoolean()');
         const boolNode = this.createNode('BooleanExpression');
-    
-        // Parse left expression
+
+        // Debug log to see token before parsing left expression
+        const tokenBefore = this.currentToken();
+        this.addLog('DEBUG', `PARSER -- Before left expression: token=${tokenBefore.type} [${tokenBefore.value}]`);
+
+        // For direct boolean values
+        if (this.match(TokenType.BOOLEAN_VALUE)) {
+            const boolToken = this.consume(TokenType.BOOLEAN_VALUE, "Expected boolean value");
+            if (boolToken) {
+                this.addChild(boolNode, this.createNode('BooleanLiteral', boolToken));
+                return boolNode;
+            } else {
+                return null;
+            }
+        }
+
+        // For string comparisons
+        if (this.match(TokenType.QUOTE)) {
+            const strExpr = this.parseStringExpression();
+            if (!strExpr) return null;
+            this.addChild(boolNode, strExpr);
+
+            if (this.match(TokenType.EQUALS)) {
+                const eqToken = this.consume(TokenType.EQUALS, "Expected ==");
+                if (eqToken) {
+                    this.addChild(boolNode, this.createNode('EqualsOp', eqToken));
+                } else {
+                    return null;
+                }
+            } else if (this.match(TokenType.NOT_EQUALS)) {
+                const neqToken = this.consume(TokenType.NOT_EQUALS, "Expected !=");
+                if (neqToken) {
+                    this.addChild(boolNode, this.createNode('NotEqualsOp', neqToken));
+                } else {
+                    return null;
+                }
+            } else {
+                this.handleError("Expected comparison operator (== or !=)", this.currentToken());
+                return null;
+            }
+
+            // Right side of comparison
+            if (this.match(TokenType.QUOTE)) {
+                const rightStr = this.parseStringExpression();
+                if (rightStr) {
+                    this.addChild(boolNode, rightStr);
+                    return boolNode;
+                } else {
+                    return null;
+                }
+            } else {
+                this.handleError("Expected string on right side of comparison", this.currentToken());
+                return null;
+            }
+        }
+
+        // For identifier or numeric comparisons
+        if (this.match(TokenType.IDENTIFIER) || this.match(TokenType.DIGIT)) {
+            const identOrDigit = this.currentToken();
+            // Parse left side without consuming operators
+            const leftExpr = this.parseTerm();
+            if (!leftExpr) {
+                return null;
+            }
+            this.addChild(boolNode, leftExpr);
+
+            // Check for comparison operators
+            if (this.match(TokenType.EQUALS)) {
+                const eqToken = this.consume(TokenType.EQUALS, "Expected ==");
+                if (eqToken) {
+                    this.addChild(boolNode, this.createNode('EqualsOp', eqToken));
+                } else {
+                    return null;
+                }
+            } else if (this.match(TokenType.NOT_EQUALS)) {
+                const neqToken = this.consume(TokenType.NOT_EQUALS, "Expected !=");
+                if (neqToken) {
+                    this.addChild(boolNode, this.createNode('NotEqualsOp', neqToken));
+                } else {
+                    return null;
+                }
+            } else {
+                this.handleError("Expected comparison operator (== or !=)", this.currentToken());
+                return null;
+            }
+
+            // Parse right side
+            const rightExpr = this.parseTerm();
+            if (rightExpr) {
+                this.addChild(boolNode, rightExpr);
+            } else {
+                return null;
+            }
+
+            return boolNode;
+        }
+
+        // Fallback to standard expression parsing (might need improvement)
         const leftExpr = this.parseExpression();
         if (leftExpr) {
             this.addChild(boolNode, leftExpr);
         } else {
             return null;
         }
-    
+
+        // Debug log after parsing left expression
+        const tokenAfter = this.currentToken();
+        this.addLog('DEBUG', `PARSER -- After left expression: token=${tokenAfter.type} [${tokenAfter.value}]`);
+
         // Parse comparison operator
         if (this.match(TokenType.EQUALS)) {
+            this.addLog('DEBUG', 'PARSER -- Found EQUALS operator');
             const eqToken = this.consume(TokenType.EQUALS, "");
             if (eqToken) {
                 this.addChild(boolNode, this.createNode('EqualsOp', eqToken));
@@ -758,6 +854,7 @@ export class Parser {
                 return null;
             }
         } else if (this.match(TokenType.NOT_EQUALS)) {
+            this.addLog('DEBUG', 'PARSER -- Found NOT_EQUALS operator');
             const neqToken = this.consume(TokenType.NOT_EQUALS, "");
             if (neqToken) {
                 this.addChild(boolNode, this.createNode('NotEqualsOp', neqToken));
@@ -768,7 +865,7 @@ export class Parser {
             this.handleError("Expected comparison operator (== or !=)", this.currentToken());
             return null;
         }
-    
+
         // Parse right expression
         const rightExpr = this.parseExpression();
         if (rightExpr) {
@@ -776,7 +873,7 @@ export class Parser {
         } else {
             return null;
         }
-    
+
         return boolNode;
     }
 
@@ -784,21 +881,21 @@ export class Parser {
     private parseExpression(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER -- parseExpression()');
         const exprNode = this.createNode('Expression');
-        
+
         // Parse first term
         const firstTerm = this.parseTerm();
         if (!firstTerm) {
             return null;
         }
         this.addChild(exprNode, firstTerm);
-        
-        // Check for arithmetic operator
-        if (this.match(TokenType.INT_OP)) {  // Assuming INT_OP is your token type for '+', '-', etc.
+
+        // Check for arithmetic operator (but not comparison operators)
+        if (this.match(TokenType.INT_OP)) {
             const opToken = this.consume(TokenType.INT_OP, "Expected arithmetic operator");
             if (opToken) {
                 // Add the operator to the expression
                 this.addChild(exprNode, this.createNode('Operator', opToken));
-                
+
                 // Parse the second term
                 const secondTerm = this.parseTerm();
                 if (secondTerm) {
@@ -810,7 +907,7 @@ export class Parser {
                 return null;
             }
         }
-        
+
         this.addLog('DEBUG', 'PARSER -- Parsing Expression parsed successfully');
         return exprNode;
     }
@@ -819,30 +916,47 @@ export class Parser {
     private parseTerm(): ASTNode | null {
         this.addLog('DEBUG', 'PARSER -- parseTerm()');
         const current = this.currentToken();
-    
+
         if (this.match(TokenType.LEFT_PAREN)) {
-            // Handle parenthesized expressions
             this.addLog('DEBUG', 'PARSER -- Parsing parenthesized expression');
-            
+
             // Consume opening parenthesis
             const leftParen = this.consume(TokenType.LEFT_PAREN, "");
             if (!leftParen) return null;
-            
-            // Parse the expression inside parentheses
-            const expr = this.parseBooleanExpression(); // This might be a boolean expression
-            if (!expr) return null;
-            
-            // Consume closing parenthesis
-            const rightParen = this.consume(TokenType.RIGHT_PAREN, "Expected ')' to close expression");
-            if (!rightParen) return null;
-            
-            // Create a node for the parenthesized expression
-            const parenExpr = this.createNode('ParenthesizedExpression');
-            this.addChild(parenExpr, this.createNode('LeftParen', leftParen));
-            this.addChild(parenExpr, expr);
-            this.addChild(parenExpr, this.createNode('RightParen', rightParen));
-            
-            return parenExpr;
+
+            // Special case for boolean expressions in parentheses
+            if (this.match(TokenType.IDENTIFIER) || this.match(TokenType.DIGIT) || this.match(TokenType.QUOTE)) {
+                const expr = this.parseBooleanExpression();
+                if (!expr) return null;
+
+                // Consume closing parenthesis
+                const rightParen = this.consume(TokenType.RIGHT_PAREN, "Expected ')' to close expression");
+                if (!rightParen) return null;
+
+                // Create a node for the parenthesized expression
+                const parenExpr = this.createNode('ParenthesizedExpression');
+                this.addChild(parenExpr, this.createNode('LeftParen', leftParen));
+                this.addChild(parenExpr, expr);
+                this.addChild(parenExpr, this.createNode('RightParen', rightParen));
+
+                return parenExpr;
+            } else {
+                // Regular expression in parentheses
+                const expr = this.parseExpression();
+                if (!expr) return null;
+
+                // Consume closing parenthesis
+                const rightParen = this.consume(TokenType.RIGHT_PAREN, "Expected ')' to close expression");
+                if (!rightParen) return null;
+
+                // Create a node for the parenthesized expression
+                const parenExpr = this.createNode('ParenthesizedExpression');
+                this.addChild(parenExpr, this.createNode('LeftParen', leftParen));
+                this.addChild(parenExpr, expr);
+                this.addChild(parenExpr, this.createNode('RightParen', rightParen));
+
+                return parenExpr;
+            }
         } else if (this.match(TokenType.DIGIT)) {
             const digitToken = this.consume(TokenType.DIGIT, "Expected digit");
             if (digitToken) {
@@ -873,7 +987,7 @@ export class Parser {
                 return null;
             }
         } else {
-            this.handleError(`Expected term (digit, identifier, or boolean), got ${current.value}`, current);
+            this.handleError(`Expected term (digit, identifier, boolean, or string), got ${current.value}`, current);
             return null;
         }
     }
