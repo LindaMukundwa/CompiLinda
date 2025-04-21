@@ -59,7 +59,7 @@ export class ASTAdapter {
      */
     private static convertNode(cstNode: CSTNode): ASTNode | null {
         if (!cstNode) return null;
-    
+
         // Get line and column from token or first child if available
         const line = cstNode.token?.line || cstNode.children?.[0]?.token?.line || 0;
         const column = cstNode.token?.column || cstNode.children?.[0]?.token?.column || 0;
@@ -178,7 +178,7 @@ export class ASTAdapter {
     private static convertBlock(cstNode: CSTNode, line: number, column: number): ASTNode {
         // Find the StatementList child if it exists
         const statementList = cstNode.children.find(child => child.name === 'StatementList');
-        
+
         let children: ASTNode[] = [];
         if (statementList) {
             // Convert all statements in the list
@@ -187,7 +187,7 @@ export class ASTAdapter {
                 if (converted) children.push(converted);
             }
         }
-        
+
         return {
             type: NodeType.Block,
             line,
@@ -240,7 +240,7 @@ export class ASTAdapter {
     private static convertVarDeclaration(cstNode: CSTNode, line: number, column: number): ASTNode {
         const typeNode = cstNode.children.find(c => c.name === 'Type');
         const identNode = cstNode.children.find(c => c.name === 'Identifier');
-        
+
         return {
             type: NodeType.VarDeclaration,
             line,
@@ -426,20 +426,91 @@ export class ASTAdapter {
      * Convert an Expression node
      */
     private static convertExpression(cstNode: CSTNode, line: number, column: number): ASTNode {
-        // In your grammar, expressions are just identifiers or literals
         for (const child of cstNode.children) {
-            if (child.name === 'Identifier') {
+            if (child.name === 'Identifier' && child.token) {
                 return {
                     type: NodeType.Identifier,
                     line,
                     column,
-                    name: child.token?.value || "",
-                    value: child.token?.value || ""
+                    name: child.token.value || "",
+                    value: child.token.value || ""
+                };
+            } else if (child.name === 'IntLiteral' && child.token) {
+                // Handle integer literals
+                const intValue = parseInt(child.token.value, 10);
+                return {
+                    type: NodeType.IntegerLiteral,
+                    line,
+                    column,
+                    value: isNaN(intValue) ? 0 : intValue
+                };
+            } else if (child.name === 'BooleanLiteral' && child.token) {
+                // Handle boolean literals directly
+                const boolValue = child.token.value === 'true';
+                return {
+                    type: NodeType.BooleanLiteral,
+                    line,
+                    column,
+                    value: boolValue
+                };
+            } else if ((child.name === 'Digit' || child.name === 'Digits') && child.token) {
+                // Handle numeric values possibly represented as digits
+                const intValue = parseInt(child.token.value, 10);
+                return {
+                    type: NodeType.IntegerLiteral,
+                    line,
+                    column,
+                    value: isNaN(intValue) ? 0 : intValue
+                };
+            } else if (child.name === 'true' || child.name === 'false') {
+                // Direct boolean keywords
+                return {
+                    type: NodeType.BooleanLiteral,
+                    line,
+                    column,
+                    value: child.name === 'true'
                 };
             }
         }
 
-        // Default to integer literal if no specific type found
+        // If we couldn't find a more specific type, search for any token with a value
+        for (const child of cstNode.children) {
+            if (child.token && child.token.value !== undefined) {
+                // Try to determine the type from the value
+                const value = child.token.value;
+
+                // Check if it's a number
+                if (!isNaN(Number(value))) {
+                    return {
+                        type: NodeType.IntegerLiteral,
+                        line,
+                        column,
+                        value: parseInt(value, 10)
+                    };
+                }
+
+                // Check if it's a boolean
+                if (value === 'true' || value === 'false') {
+                    return {
+                        type: NodeType.BooleanLiteral,
+                        line,
+                        column,
+                        value: value === 'true'
+                    };
+                }
+
+                // Default to treating it as an identifier
+                return {
+                    type: NodeType.Identifier,
+                    line,
+                    column,
+                    name: value,
+                    value: value
+                };
+            }
+        }
+
+        // Default to integer literal if nothing else matched
         return {
             type: NodeType.IntegerLiteral,
             line,
@@ -452,12 +523,37 @@ export class ASTAdapter {
      * Convert a StringExpression node
      */
     private static convertStringExpression(cstNode: CSTNode, line: number, column: number): ASTNode {
-        // Extract all character tokens to form the string
+        // Build the string value from all character tokens
         let value = "";
 
-        for (const child of cstNode.children) {
-            if (child.name === 'Char' && child.token) {
-                value += child.token.value;
+        // Check for direct string value in the node itself
+        if (cstNode.token && typeof cstNode.token.value === 'string') {
+            // If the node itself has the string value
+            value = cstNode.token.value;
+
+            // Remove quotes if present (optional based on your lexer implementation)
+            if (value.startsWith('"') && value.endsWith('"')) {
+                value = value.substring(1, value.length - 1);
+            }
+        } else {
+            // Otherwise collect from children
+            for (const child of cstNode.children) {
+                // Check for any node with a token that has a string value
+                if (child.token && typeof child.token.value === 'string') {
+                    // For nodes representing string content
+                    if (child.name === 'Char' || child.name === 'StringContent') {
+                        value += child.token.value;
+                    } else if (child.name === 'StringLiteral' || child.name === 'StringExpression') {
+                        // For complete string nodes
+                        let str = child.token.value;
+                        // Remove quotes if needed
+                        if (str.startsWith('"') && str.endsWith('"')) {
+                            str = str.substring(1, str.length - 1);
+                        }
+                        value = str;
+                        break;
+                    }
+                }
             }
         }
 
@@ -467,6 +563,24 @@ export class ASTAdapter {
             column,
             value
         };
+    }
+
+    // Add this to your ASTAdapter class
+    private static debugNodeStructure(node: CSTNode): string {
+        if (!node) return 'null';
+
+        let result = `Node: ${node.name}, `;
+        if (node.token) {
+            result += `Token: {value: ${node.token.value}, line: ${node.token.line}, col: ${node.token.column}}, `;
+        }
+
+        if (node.children && node.children.length > 0) {
+            result += `Children: [${node.children.map(c => c.name).join(', ')}]`;
+        } else {
+            result += 'No children';
+        }
+
+        return result;
     }
 }
 
@@ -493,14 +607,14 @@ export class SemanticAnalyzer {
         try {
             console.log("SemanticAnalyzer initializing with CST:", cst);
             this.cst = cst;
-    
+
             // Initialize with provided program number or default to 1
             this.programCounter = programNumber || 1;
-    
+
             // Initialize all state fresh for each new instance
             this.ast = ASTAdapter.convert(cst);
             console.log("AST created:", this.ast);
-    
+
             // Initialize scope
             this.currentScope = 0;
             this.scopeStack = [0];
@@ -513,7 +627,7 @@ export class SemanticAnalyzer {
         }
     }
 
-    
+
     /**
      * Main analysis method
      * Returns analysis results including symbol table and issues
@@ -557,25 +671,25 @@ export class SemanticAnalyzer {
         output += '--------------------------------------\n';
         output += 'Name\tType\tInit?\tUsed?\tScope\tLine\n';
         output += '-------------------------------------\n';
-    
+
         const entries: SymbolTableEntry[] = [];
         this.symbolTable.forEach((symbolEntries, name) => {
             symbolEntries.forEach(entry => {
                 entries.push({ ...entry, name });
             });
         });
-    
+
         // Sort by scope and then by line number
         entries.sort((a, b) => {
             if (a.scope !== b.scope) return a.scope - b.scope;
             return a.line - b.line;
         });
-    
+
         // Print each entry
         entries.forEach(entry => {
             output += `${entry.name}\t${entry.type}\t${entry.isInitialized}\t${entry.isUsed}\t${entry.scope}\t${entry.line}\n`;
         });
-    
+
         return output;
     }
 
@@ -774,10 +888,10 @@ export class SemanticAnalyzer {
         const name = node.varName;
         const line = node.line;
         const column = node.column;
-    
+
         // Add to symbol table - starts as uninitialized and unused
         this.addSymbol(name, type, line, column);
-        
+
         return type;
     }
 
@@ -788,27 +902,27 @@ export class SemanticAnalyzer {
         const name = node.identifier.value;
         const line = node.line;
         const column = node.column;
-    
+
         // Check if variable exists
         const symbol = this.getSymbol(name);
         if (!symbol) {
             this.addError(`Assignment to undeclared variable '${name}'`, line, column);
             return null;
         }
-    
+
         // Mark as initialized (but not used yet - only mark as used when referenced)
         this.markInitialized(name);
-    
+
         // Type check the expression
         const exprType = this.analyzeNode(node.expression);
-        
+
         if (symbol.type !== exprType) {
             this.addError(
                 `Type mismatch in assignment: Cannot assign ${exprType} to ${symbol.type}`,
                 line, column
             );
         }
-    
+
         return symbol.type;
     }
 
@@ -916,15 +1030,15 @@ export class SemanticAnalyzer {
     private analyzeIdentifier(node: any): string | null {
         const name = node.value;
         const symbol = this.getSymbol(name);
-        
+
         if (!symbol) {
             this.addError(`Undefined variable '${name}'`, node.line, node.column);
             return null;
         }
-    
+
         // Only mark as used when the identifier is actually referenced
         this.markUsed(name);
-        
+
         return symbol.type;
     }
 
@@ -937,7 +1051,7 @@ export class SemanticAnalyzer {
         this.currentScope++;
         this.scopeStack.push(this.currentScope);
     }
-    
+
     private exitScope(): void {
         this.checkForUnusedVariables(this.currentScope);
         this.scopeStack.pop();
