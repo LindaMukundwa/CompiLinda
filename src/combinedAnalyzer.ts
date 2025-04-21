@@ -59,10 +59,10 @@ export class ASTAdapter {
      */
     private static convertNode(cstNode: CSTNode): ASTNode | null {
         if (!cstNode) return null;
-
-        // Get line and column from token if available
-        const line = cstNode.token?.line || 0;
-        const column = cstNode.token?.column || 0;
+    
+        // Get line and column from token or first child if available
+        const line = cstNode.token?.line || cstNode.children?.[0]?.token?.line || 0;
+        const column = cstNode.token?.column || cstNode.children?.[0]?.token?.column || 0;
 
         switch (cstNode.name) {
             case 'Programs':
@@ -565,13 +565,17 @@ export class SemanticAnalyzer {
             });
         });
     
-        entries.sort((a, b) => a.scope - b.scope || a.line - b.line);
+        // Sort by scope and then by line number
+        entries.sort((a, b) => {
+            if (a.scope !== b.scope) return a.scope - b.scope;
+            return a.line - b.line;
+        });
     
+        // Print each entry
         entries.forEach(entry => {
             output += `${entry.name}\t${entry.type}\t${entry.isInitialized}\t${entry.isUsed}\t${entry.scope}\t${entry.line}\n`;
         });
     
-        // Rest of the print method...
         return output;
     }
 
@@ -771,10 +775,9 @@ export class SemanticAnalyzer {
         const line = node.line;
         const column = node.column;
     
-        // Add to symbol table since it starts as uninitialized
+        // Add to symbol table - starts as uninitialized and unused
         this.addSymbol(name, type, line, column);
         
-        // Don't mark as initialized here but only when actually assigned
         return type;
     }
 
@@ -793,26 +796,19 @@ export class SemanticAnalyzer {
             return null;
         }
     
-        // Mark as initialized and used
+        // Mark as initialized (but not used yet - only mark as used when referenced)
         this.markInitialized(name);
-        this.markUsed(name);
     
         // Type check the expression
         const exprType = this.analyzeNode(node.expression);
         
-        // Allow these valid assignments:
-        // int = int
-        // boolean = boolean
-        // string = string
-        if (symbol.type === exprType) {
-            return symbol.type;
+        if (symbol.type !== exprType) {
+            this.addError(
+                `Type mismatch in assignment: Cannot assign ${exprType} to ${symbol.type}`,
+                line, column
+            );
         }
     
-        // If we get here, there's a type mismatch
-        this.addError(
-            `Type mismatch in assignment: Cannot assign ${exprType} to ${symbol.type}`,
-            line, column
-        );
         return symbol.type;
     }
 
@@ -926,7 +922,7 @@ export class SemanticAnalyzer {
             return null;
         }
     
-        // Mark as used but don't mark as initialized (that happens in assignments)
+        // Only mark as used when the identifier is actually referenced
         this.markUsed(name);
         
         return symbol.type;
@@ -941,16 +937,11 @@ export class SemanticAnalyzer {
         this.currentScope++;
         this.scopeStack.push(this.currentScope);
     }
-
-    /**
-     * Exit the current scope
-     */
+    
     private exitScope(): void {
-        // Check for unused variables in the scope we're exiting
         this.checkForUnusedVariables(this.currentScope);
-
         this.scopeStack.pop();
-        this.currentScope = this.scopeStack[this.scopeStack.length - 1];
+        this.currentScope = this.scopeStack[this.scopeStack.length - 1] || 0;
     }
 
     /**
