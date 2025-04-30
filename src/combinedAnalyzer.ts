@@ -523,47 +523,26 @@ export class ASTAdapter {
      * Convert a StringExpression node
      */
     private static convertStringExpression(cstNode: CSTNode, line: number, column: number): ASTNode {
-        // Build the string value from all character tokens
         let value = "";
-
-        // Check for direct string value in the node itself
-        if (cstNode.token && typeof cstNode.token.value === 'string') {
-            // If the node itself has the string value
-            value = cstNode.token.value;
-
-            // Remove quotes if present (optional based on your lexer implementation)
-            if (value.startsWith('"') && value.endsWith('"')) {
-                value = value.substring(1, value.length - 1);
-            }
-        } else {
-            // Otherwise collect from children
+    
+        // Build value from child character nodes
+        if (cstNode.children && cstNode.children.length > 0) {
             for (const child of cstNode.children) {
-                // Check for any node with a token that has a string value
-                if (child.token && typeof child.token.value === 'string') {
-                    // For nodes representing string content
-                    if (child.name === 'Char' || child.name === 'StringContent') {
-                        value += child.token.value;
-                    } else if (child.name === 'StringLiteral' || child.name === 'StringExpression') {
-                        // For complete string nodes
-                        let str = child.token.value;
-                        // Remove quotes if needed
-                        if (str.startsWith('"') && str.endsWith('"')) {
-                            str = str.substring(1, str.length - 1);
-                        }
-                        value = str;
-                        break;
-                    }
+                if (child.name === 'Char' && child.token?.value) {
+                    value += child.token.value;
                 }
             }
         }
-
+    
         return {
             type: NodeType.StringLiteral,
+            value,
             line,
-            column,
-            value
+            column
         };
     }
+    
+    
 
     // Add this to your ASTAdapter class
     private static debugNodeStructure(node: CSTNode): string {
@@ -607,20 +586,21 @@ export class SemanticAnalyzer {
         try {
             console.log("SemanticAnalyzer initializing with CST:", cst);
             this.cst = cst;
-
+    
             // Initialize with provided program number or default to 1
             this.programCounter = programNumber || 1;
-
+    
             // Initialize all state fresh for each new instance
             this.ast = ASTAdapter.convert(cst);
             console.log("AST created:", this.ast);
-
-            // Initialize scope
+    
+            // FIXED: Initialize scope to 0 for global scope
             this.currentScope = 0;
-            this.scopeStack = [0];
-            this.symbolTable = new Map();  // Fresh symbol table
-            this.issues = [];             // Fresh issues list
-            this.lexerLogs = [];          // Reset lexer logs
+            this.scopeStack = [-1];
+            this.enterScope();
+            this.symbolTable = new Map();
+            this.issues = [];
+            this.lexerLogs = [];
         } catch (error) {
             console.error("SemanticAnalyzer constructor error:", error);
             throw error;
@@ -637,6 +617,7 @@ export class SemanticAnalyzer {
         issues: SemanticIssue[];
         ast: ASTNode | null;
         programNumber: number;
+        
     } {
         if (!this.ast) {
             this.addError("Failed to generate AST from parser output", 0, 0);
@@ -654,8 +635,10 @@ export class SemanticAnalyzer {
         // Check for any remaining unused variables in global scope
         this.checkForUnusedVariables(0);
 
+        const hasErrors = this.issues.some(issue => issue.type === 'error');
+
         return {
-            symbolTable: this.symbolTable,
+            symbolTable: hasErrors ? new Map() : this.symbolTable,
             issues: this.issues,
             ast: this.ast,
             programNumber: this.programCounter
@@ -696,7 +679,20 @@ export class SemanticAnalyzer {
     /**
  * Print the AST in a readable format
  */
-    private printAST(node: ASTNode | null, indent: string = ''): string {
+
+    public printAST(node: ASTNode | null = null, indent: string = ''): string {
+        // If no node is provided, use the root AST
+        const astNode = node || this.ast;
+        if (!astNode) return 'No AST available';
+    
+        let output = '';
+        
+        // Call the private implementation
+        output = this.printASTNode(astNode, indent);
+        return output;
+    }
+
+    private printASTNode(node: ASTNode | null, indent: string = ''): string {
         if (!node) return '';
 
         let output = '';
@@ -706,7 +702,7 @@ export class SemanticAnalyzer {
                 output += `${indent}< PROGRAM >\n`;
                 if (node.children) {
                     for (const child of node.children) {
-                        output += this.printAST(child, indent + '-');
+                        output += this.printASTNode(child, indent + '-');
                     }
                 }
                 break;
@@ -714,7 +710,7 @@ export class SemanticAnalyzer {
                 output += `${indent}< BLOCK >\n`;
                 if (node.children) {
                     for (const child of node.children) {
-                        output += this.printAST(child, indent + '-');
+                        output += this.printASTNode(child, indent + '-');
                     }
                 }
                 break;
@@ -726,7 +722,7 @@ export class SemanticAnalyzer {
             case NodeType.PrintStatement:
                 output += `${indent}< Print Statement >\n`;
                 if (node.expression) {
-                    output += this.printAST(node.expression, indent + '--');
+                    output += this.printASTNode(node.expression, indent + '--');
                 }
                 break;
             case NodeType.AssignmentStatement:
@@ -738,11 +734,12 @@ export class SemanticAnalyzer {
                     if (node.expression.type === NodeType.IntegerLiteral) {
                         output += `${indent}---[ ${node.expression.value} ]\n`;
                     } else if (node.expression.type === NodeType.StringLiteral) {
+                        console.log("Assigning string value:", node.expression.value);
                         output += `${indent}---[ ${node.expression.value} ]\n`;
                     } else if (node.expression.type === NodeType.BooleanLiteral) {
                         output += `${indent}---[ ${node.expression.value ? 'true' : 'false'} ]\n`;
                     } else {
-                        output += this.printAST(node.expression, indent + '---');
+                        output += this.printASTNode(node.expression, indent + '---');
                     }
                 }
                 break;
@@ -852,7 +849,8 @@ export class SemanticAnalyzer {
      * Analyze program (root node)
      */
     private analyzeProgram(node: any): string | null {
-        // Process all children of the program node
+        // The program node itself doesn't create a new scope
+        // Just process all its children
         if (node.children && Array.isArray(node.children)) {
             for (const child of node.children) {
                 this.analyzeNode(child);
@@ -865,16 +863,16 @@ export class SemanticAnalyzer {
      * Analyze a code block
      */
     private analyzeBlock(node: any): string | null {
-        // Enter a new scope
+        // Enter a new scope ONLY for Block nodes, not Program nodes
         this.enterScope();
-
+    
         // Process all statements in the block
         if (node.children && Array.isArray(node.children)) {
             for (const child of node.children) {
                 this.analyzeNode(child);
             }
         }
-
+    
         // Exit the scope when done with the block
         this.exitScope();
         return null;
@@ -899,31 +897,57 @@ export class SemanticAnalyzer {
      * Analyze assignment statement
      */
     private analyzeAssignment(node: any): string | null {
-        const name = node.identifier.value;
+        const name = node.identifier.name || node.identifier.value;
         const line = node.line;
         const column = node.column;
-
+    
         // Check if variable exists
         const symbol = this.getSymbol(name);
         if (!symbol) {
             this.addError(`Assignment to undeclared variable '${name}'`, line, column);
             return null;
         }
-
-        // Mark as initialized (but not used yet - only mark as used when referenced)
+    
+        // Mark as initialized
         this.markInitialized(name);
-
-        // Type check the expression
-        const exprType = this.analyzeNode(node.expression);
-
-        if (symbol.type !== exprType) {
+    
+        // Normalize variable and expression types for comparison
+        const symbolType = this.normalizeType(symbol.type);
+        
+        // Get expression type based on node type
+        let exprType: string;
+        
+        if (node.expression.type === NodeType.StringLiteral) {
+            console.log("Assigning string value:", node.expression.value);
+            exprType = 'string';
+        } else if (node.expression.type === NodeType.IntegerLiteral) {
+            exprType = 'int';
+        } else if (node.expression.type === NodeType.BooleanLiteral) {
+            exprType = 'boolean';
+        } else {
+            // For other expressions, analyze recursively
+            exprType = this.analyzeNode(node.expression) || 'unknown';
+        }
+        
+        // Compare normalized types
+        if (symbolType !== exprType) {
             this.addError(
                 `Type mismatch in assignment: Cannot assign ${exprType} to ${symbol.type}`,
                 line, column
             );
         }
-
+    
         return symbol.type;
+    }
+    
+    // Helper method to normalize type names for comparison
+    private normalizeType(type: string): string {
+        // Make sure types match exactly as strings
+        type = type.toLowerCase();
+        if (type === 'boolean') return 'boolean';
+        if (type === 'int' || type === 'integer') return 'int';
+        if (type === 'string') return 'string';
+        return type;
     }
 
     /**
@@ -1028,17 +1052,17 @@ export class SemanticAnalyzer {
      * Analyze identifier reference
      */
     private analyzeIdentifier(node: any): string | null {
-        const name = node.value;
+        const name = node.name || node.value;
         const symbol = this.getSymbol(name);
-
+        
         if (!symbol) {
             this.addError(`Undefined variable '${name}'`, node.line, node.column);
             return null;
         }
-
-        // Only mark as used when the identifier is actually referenced
+    
+        // Mark as used
         this.markUsed(name);
-
+        
         return symbol.type;
     }
 
@@ -1048,20 +1072,28 @@ export class SemanticAnalyzer {
      * Enter a new scope
      */
     private enterScope(): void {
+        // Increment scope counter when entering a new block
         this.currentScope++;
         this.scopeStack.push(this.currentScope);
+        console.log(`Entering scope ${this.currentScope}, stack: [${this.scopeStack.join(', ')}]`);
     }
 
     private exitScope(): void {
+        // Check for unused variables before exiting
         this.checkForUnusedVariables(this.currentScope);
+        
+        // Remove the current scope from stack
         this.scopeStack.pop();
-        this.currentScope = this.scopeStack[this.scopeStack.length - 1] || 0;
+        
+        // Set current scope to the previous one on stack
+        this.currentScope = this.scopeStack[this.scopeStack.length - 1];
+        console.log(`Exiting to scope ${this.currentScope}, stack: [${this.scopeStack.join(', ')}]`);
     }
 
     /**
      * Check for unused variables in a specific scope
      */
-    private checkForUnusedVariables(scope: number): void {
+    /* private checkForUnusedVariables(scope: number): void {
         this.symbolTable.forEach((entries, name) => {
             entries.forEach(entry => {
                 if (entry.scope === scope) {
@@ -1080,6 +1112,24 @@ export class SemanticAnalyzer {
                 }
             });
         });
+    } */
+
+    private checkForUnusedVariables(scope: number): void {
+        for (const [name, entries] of this.symbolTable.entries()) {
+            for (const entry of entries) {
+                // Only warn if it wasn't reported as an error before
+                const alreadyErrored = this.issues.some(i => i.message.includes(name) && i.type === 'error');
+                if (!alreadyErrored) {
+                    if (!entry.isUsed) {
+                        this.addWarning(`Variable '${name}' declared but never used`, entry.line, entry.column);
+                    }
+                    if (entry.isInitialized && !entry.isUsed) {
+                        this.addWarning(`Variable '${name}' initialized but never used`, entry.line, entry.column);
+                    }
+                }
+            }
+        }
+        
     }
 
     // ===== Symbol Table Methods =====
@@ -1091,13 +1141,13 @@ export class SemanticAnalyzer {
         const entry: SymbolTableEntry = {
             name,
             type,
-            scope: this.currentScope,
+            scope: this.currentScope, // This should now be correct
             line,
             column,
-            isInitialized: false,   // will be set to true when assigned
-            isUsed: false           // will be set to true when used
+            isInitialized: false,
+            isUsed: false
         };
-
+    
         // Check for redeclaration in the same scope
         const existingEntries = this.symbolTable.get(name) || [];
         for (const existing of existingEntries) {
@@ -1109,10 +1159,11 @@ export class SemanticAnalyzer {
                 return;
             }
         }
-
+    
         // Add the new entry
         existingEntries.push(entry);
         this.symbolTable.set(name, existingEntries);
+        console.log(`Added symbol: ${name}, type: ${type}, scope: ${this.currentScope}`);
     }
 
     /**
