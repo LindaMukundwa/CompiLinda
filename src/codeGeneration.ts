@@ -37,25 +37,20 @@ const BOOLEAN_VALUES = {
     FALSE: 0xF0  // Representing "false"
 };
 
-// Define the type of nodes in our AST
-type NodeType =
-    'Block' | 'VarDecl' | 'AssignmentStatement' | 'PrintStatement' |
-    'IfStatement' | 'WhileStatement' | 'Equals' | 'NotEquals' |
-    'IntExpr' | 'StringExpr' | 'BooleanExpr' | 'Identifier'; 
-
-// import in the node type from the combined analyzer 
-
 // Define the structure of our AST node
 interface ASTNode {
     type: NodeType;
     name?: string;
     value?: any;
     children?: ASTNode[];
+    line?: number;
+    column?: number;
+    operator?: string; // Add operator property for binary expressions
 }
 
 // Define the structure for a symbol in the symbol table
 interface Symbol {
-    type: string;
+    type: string | NodeType; // Allow both string and NodeType
     name: string;
     address: number;
     scope: number;
@@ -110,26 +105,25 @@ class CodeGenerator {
      */
     private visit(node: ASTNode): void {
         switch (node.type) {
-            case 'Block':
+            case NodeType.Block:
                 this.generateBlock(node);
                 break;
-            case 'VarDecl':
+            case NodeType.VarDeclaration:
                 this.generateVarDecl(node);
                 break;
-            case 'AssignmentStatement':
+            case NodeType.AssignmentStatement:
                 this.generateAssignment(node);
                 break;
-            case 'PrintStatement':
+            case NodeType.PrintStatement:
                 this.generatePrintStatement(node);
                 break;
-            case 'IfStatement':
+            case NodeType.IfStatement:
                 this.generateIfStatement(node);
                 break;
-            case 'WhileStatement':
+            case NodeType.WhileStatement:
                 this.generateWhileStatement(node);
                 break;
-            case 'Equals':
-            case 'NotEquals':
+            case NodeType.BinaryExpression:
                 this.generateComparison(node);
                 break;
             default:
@@ -160,7 +154,7 @@ class CodeGenerator {
      */
     private generateVarDecl(node: ASTNode): void {
         if (!node.children || node.children.length < 2) {
-            throw new Error('Invalid VarDecl node');
+            throw new Error('Invalid VarDeclaration node');
         }
 
         const type = node.children[0].type;
@@ -209,21 +203,21 @@ class CodeGenerator {
         }
 
         // Generate code based on the value type
-        if (valueNode.type === 'IntExpr') {
+        if (valueNode.type === NodeType.IntegerLiteral) {
             // Integer assignment
             this.emitLdaConst(valueNode.value);
             this.emitSta(symbol.address);
-        } else if (valueNode.type === 'BooleanExpr') {
+        } else if (valueNode.type === NodeType.BooleanLiteral) {
             // Boolean assignment
             const boolValue = valueNode.value === true ? BOOLEAN_VALUES.TRUE : BOOLEAN_VALUES.FALSE;
             this.emitLdaConst(boolValue);
             this.emitSta(symbol.address);
-        } else if (valueNode.type === 'StringExpr') {
+        } else if (valueNode.type === NodeType.StringLiteral) {
             // String assignment
             const stringAddr = this.getStringAddress(valueNode.value);
             this.emitLdaConst(stringAddr);
             this.emitSta(symbol.address);
-        } else if (valueNode.type === 'Identifier') {
+        } else if (valueNode.type === NodeType.Identifier) {
             // Variable-to-variable assignment
             const sourceSymbol = this.findSymbol(valueNode.name!);
             if (!sourceSymbol) {
@@ -246,22 +240,22 @@ class CodeGenerator {
 
         const exprNode = node.children[0];
 
-        if (exprNode.type === 'IntExpr') {
+        if (exprNode.type === NodeType.IntegerLiteral) {
             // Print integer constant
             this.emitLdaConst(exprNode.value);
             this.generatePrintInt();
-        } else if (exprNode.type === 'BooleanExpr') {
+        } else if (exprNode.type === NodeType.BooleanLiteral) {
             // Print boolean constant
             const boolValue = exprNode.value === true ? BOOLEAN_VALUES.TRUE : BOOLEAN_VALUES.FALSE;
             this.emitLdaConst(boolValue);
             this.generatePrintBool();
-        } else if (exprNode.type === 'StringExpr') {
+        } else if (exprNode.type === NodeType.StringLiteral) {
             // Print string constant
             const stringAddr = this.getStringAddress(exprNode.value);
             this.emitLdyConst(stringAddr);
             this.emitLdxConst(SYSCALLS.PRINT_STRING);
             this.emitSys();
-        } else if (exprNode.type === 'Identifier') {
+        } else if (exprNode.type === NodeType.Identifier) {
             // Print variable
             const symbol = this.findSymbol(exprNode.name!);
 
@@ -385,57 +379,50 @@ class CodeGenerator {
         const rightNode = node.children[1];
 
         // Get the left operand
-        if (leftNode.type === 'Identifier') {
+        if (leftNode.type === NodeType.Identifier) {
             const symbol = this.findSymbol(leftNode.name!);
             if (!symbol) {
                 throw new Error(`Undefined variable: ${leftNode.name}`);
             }
             this.emitLdxMem(symbol.address);
-        } else if (leftNode.type === 'IntExpr') {
+        } else if (leftNode.type === NodeType.IntegerLiteral) {
             this.emitLdxConst(leftNode.value);
         } else {
             throw new Error(`Unsupported left operand type: ${leftNode.type}`);
         }
 
         // Get the right operand
-        if (rightNode.type === 'Identifier') {
+        if (rightNode.type === NodeType.Identifier) {
             const symbol = this.findSymbol(rightNode.name!);
             if (!symbol) {
                 throw new Error(`Undefined variable: ${rightNode.name}`);
             }
             this.emitLdaConst(symbol.address);
-        } else if (rightNode.type === 'IntExpr') {
+        } else if (rightNode.type === NodeType.IntegerLiteral) {
             this.emitLdaConst(rightNode.value);
         } else {
             throw new Error(`Unsupported right operand type: ${rightNode.type}`);
         }
 
-        // Store right operand in memory for comparison
-        const tempAddr = 0x0000;
-        this.emitSta(tempAddr);
+        // Compare X register with accumulator
+        this.emitCpx(0x00);  // Compare with accumulator
 
-        // Compare X register (left) with memory (right)
-        this.emitCpx(tempAddr);
-
-        // Set accumulator based on comparison result
+        // Set result based on comparison
         this.emitLdaConst(0x00);  // Default to false
 
-        if (node.type === 'Equals') {
+        // Check if this is an equality comparison
+        if (node.operator === '==') {
             // If Z flag is clear (not equal), skip the next instruction
             this.emitByte(OPCODES.BNE);
             this.emitByte(0x02);
             this.emitLdaConst(0x01);  // Set to true if equal
-        } else if (node.type === 'NotEquals') {
+        } else if (node.operator === '!=') {
             // If Z flag is set (equal), skip the next instruction
             this.emitByte(OPCODES.BNE);
             this.emitByte(0x02);
-            this.emitLdaConst(0x01);  // Set to true if not equal
-
-            // Flip the result
-            this.emitLdaConst(0x00);  // Reset to false
-            this.emitByte(OPCODES.BNE);
-            this.emitByte(0x02);
-            this.emitLdaConst(0x01);  // Set to true
+            this.emitLdaConst(0x00);  // Set to false if equal
+        } else {
+            throw new Error(`Unsupported comparison operator: ${node.operator}`);
         }
     }
 
