@@ -330,3 +330,28 @@ tr:nth-child(even) {
 .tab-content.active {
     display: block;
 }
+
+.codegen-sections {
+    display: flex;
+    flex-wrap: wrap;
+    font-family: "Source Code Pro", serif;
+    gap: 20px;
+}
+
+.codegen-section {
+    flex: 1;
+    min-width: 300px;
+    border: 1px solid #ddd;
+    padding: 10px;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+    font-family: "Source Code Pro", serif;
+}
+
+.codegen-section pre {
+    background-color: #f0f0f0;
+    padding: 10px;
+    border-radius: 3px;
+    overflow-x: auto;
+    font-family: "Source Code Pro", serif;
+}
