@@ -1,19 +1,20 @@
 # CompiLinda 🌺
 
-This is a project aimed at making a compiler, with the current stage at a semantic analyzer. This project is a work in progress and will be updated as I continue to work on it. The grammar of the language is defined as Alan++ and as such, is the basis of the compiler.
+This is a project aimed at making a compiler. The grammar of the language is defined as Alan++ and as such, is the basis of the compiler.
 
 The first version of this compiler was made with typescript and in order to make it work locally for you, make sure to clone this repository. From there, make sure you have node installed since that is what I am using to run it on a web environment. After that, in order to run the compiler, check the installation steps:
 
 ## Project Structure 📂
 
-This compiler is a work in progress and will eventually follow a more standard compiler with a parser, semantic analyzer, and code generator. Since this is done in TypeScript, the source The project is structured as follows:
+This compiler is the final product of a working lexer, parser, semantic analyzer, and code generator based on 6502a machine. In order to run the code, make sure to use it on one of the Hall of Fame projects! Since this is done in TypeScript, the source The project is structured as follows:
 
 - src/
   - main.ts: The lexer implementation.
   - parser.ts: The parser implementation
   - combinedAnalyzer.ts: The semantic analyzer implementation
+  - codeGeneration.ts: The code generation (back-end) implementation
 
-The transpiled code is in the dist folder. The dist folder is the folder that is used to run the lexer and compiled from the src folder.**NOTE:** Please grade the main branch as this is the latest version of the compiler.
+The transpiled code is in the dist folder. The dist folder is the folder that is used to run the compiler and compiled from the src folder.
 
 ## Installation 📦
 
@@ -38,18 +39,18 @@ cd CompiLinda
 npm install
 npm run build
 ```
-4. Run the lexer:
+4. Run the compiler:
 
-By running the command below, you will transpile the code and run the lexer and parser. Then, open **index.html** in your browser to view the compiler.
+By running the command below, you will transpile the code and run the full compiler. Then, open **index.html** in your browser to view the front-end.
 ```bash
 tsc
 ```
 
 ## Usage 👩🏾‍💻
 
-All of the source code is in the src folder. The main.ts file is the entry point of the lexer and the parser.ts is the entry point of the parser. The lexer combined with the parser is a web application that allows you to compile Alan++ code into tokens then parse and create a CST. The combinedAnalyzer.ts is the semantic analyzer that produces an AST, performs type and scope checking and also a symbol table to send to code generation. 
+All of the source code is in the src folder. The lexer, parser, semantic analyzer combined with code generation is a web application that allows you to compile Alan++ code into tokens then parse and create a CST, produce an AST, symbol table with scope and type checking and then sends it all to code generation. 
 
-After running the commands above, you can run the compiler by opening the **index.html** file in your browser. Make sure to use Chrome for the best experience. Paste your source code into the text area and then click the "Compile" button to run the lexer and view the tokens as well as the parsing in the next tab. 
+After running the commands above, you can run the compiler by opening the **index.html** file in your browser. Make sure to use Chrome for the best experience. Paste your source code into the text area and then click the "Compile" button see all of the outputs. 
 
 Once everything looks correct, you should get a webpage that looks like this:
 
