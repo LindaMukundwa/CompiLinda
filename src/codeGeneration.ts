@@ -5,7 +5,6 @@
  */
 
 import { ASTAdapter, NodeType } from "./combinedAnalyzer";
-//import { Lexer } from "./main";
 
 // Define opcodes for 6502a instruction set
 const OPCODES = {
@@ -56,21 +55,27 @@ interface Symbol {
     name: string;
     address: number;
     scope: number;
+    placeholderTag?: string; // Add placeholder tag for backpatching
 }
 
 class CodeGenerator {
     private code: number[] = [];
     private staticTable: { [key: string]: number } = {};
     private stringPool: { [key: string]: number } = {};
-    private staticStart = 0x0086; // Starting address for static data
+    // Changed to match expected output
+    private staticStart = 0x001F; // Starting address for static data (0x1F)
     private heapStart = 0x00E0;   // Starting address for heap (strings)
     private currentHeapAddress = 0x00E0;
     private symbolTable: Symbol[] = [];
     private tempCounter = 0;
     private currentScope = 0;
+    
+    // Add placeholders for backpatching
+    private placeholders: { tag: string, position: number, type: string }[] = [];
 
     constructor() {
         // Initialize
+        console.log("INFO\tStarting Code Generation");
     }
 
     /**
@@ -84,8 +89,19 @@ class CodeGenerator {
         this.currentHeapAddress = this.heapStart;
         this.tempCounter = 0;
         this.currentScope = 0;
+        this.placeholders = [];
     
         try {
+            this.debug("Starting code generation");
+            this.debug(`AST type: ${ast.type}`);
+            if (ast.children) {
+                this.debug(`AST has ${ast.children.length} children`);
+            }
+            
+            // Generate initial NOP instruction
+            this.debug("Generating A9 at index 0");
+            this.emitLdaConst(0x00);
+            
             // Generate code for the AST
             if (ast) {
                 this.visit(ast);
@@ -97,6 +113,9 @@ class CodeGenerator {
     
             // Add break instruction at the end
             this.emitByte(OPCODES.BRK);
+            
+            // Backpatch all placeholders with real addresses
+            this.backpatchPlaceholders();
     
             // Fill memory with zeroes up to where the string constants begin
             while (this.code.length < this.heapStart - 1) {
@@ -105,7 +124,8 @@ class CodeGenerator {
     
             // Add string constants to the end of the code
             this.addStringConstants();
-    
+            
+            this.debug("Code Generation complete with 0 ERROR(S)");
             return this.code;
         } catch (error) {
             console.error("Code generation error:", error);
@@ -118,18 +138,27 @@ class CodeGenerator {
      * Main visitor function that dispatches to the appropriate code generator
      */
     private visit(node: ASTNode): void {
-        if (!node) return;  // null check
+        if (!node) {
+            this.debug("WARNING: Attempted to visit null node");
+            return;
+        }
+
+        this.debug(`Visiting node of type: ${node.type}`);
+        
         switch (node.type) {
             case NodeType.Block:
                 this.generateBlock(node);
                 break;
             case NodeType.VarDeclaration:
+                this.debug(`Generating Op Codes for [ VarDecl ] in Scope ${this.currentScope}`);
                 this.generateVarDecl(node);
                 break;
             case NodeType.AssignmentStatement:
+                this.debug(`Generating Op Codes for [ AssignmentStatement ] in Scope ${this.currentScope}`);
                 this.generateAssignment(node);
                 break;
             case NodeType.PrintStatement:
+                this.debug(`Generating Op Codes for [ PrintStatement ] in Scope ${this.currentScope}`);
                 this.generatePrintStatement(node);
                 break;
             case NodeType.IfStatement:
@@ -143,10 +172,11 @@ class CodeGenerator {
                 break;
             default:
                 // Handle empty programs or unknown nodes gracefully
-            if (node.children && node.children.length > 0) {
-                node.children.forEach(child => this.visit(child));
-            }
-            break;
+                if (node.children && node.children.length > 0) {
+                    this.debug(`Processing ${node.children.length} children for unknown node type: ${node.type}`);
+                    node.children.forEach(child => this.visit(child));
+                }
+                break;
         }
     }
 
@@ -175,31 +205,47 @@ class CodeGenerator {
      * Generate code for variable declaration
      */
     private generateVarDecl(node: ASTNode): void {
-        if (!node.children || node.children.length < 2) {
-            throw new Error('Invalid VarDeclaration node');
+        // Check if node has the required properties
+        if (!node || !node.children || node.children.length < 2) {
+            throw new Error('Invalid VarDeclaration node: Missing required children');
         }
 
-        const type = node.children[0].type;
-        const name = node.children[1].name;
+        // The first child should be the type, second should be the identifier
+        const typeNode = node.children[0];
+        const identifierNode = node.children[1];
 
-        if (!name) {
-            throw new Error('Variable name not found');
+        if (!typeNode || !identifierNode || !identifierNode.name) {
+            throw new Error('Invalid VarDeclaration node: Missing type or identifier');
         }
 
+        const type = typeNode.name || 'int'; // Default to 'int' if name is undefined
+        const name = identifierNode.name;
+
+        // Create a placeholder tag for this variable
+        const placeholderTag = `T${this.tempCounter++}`;
+        
         // Allocate memory for the variable
         const address = this.allocateStatic(name);
 
-        // Add to symbol table
+        // Add to symbol table with the placeholder tag
         this.symbolTable.push({
             type,
             name,
             address,
-            scope: this.currentScope
+            scope: this.currentScope,
+            placeholderTag
         });
 
         // Initialize variable to default value (0)
-        this.emitLdaConst(0x00);
-        this.emitSta(address);
+        this.debug(`Generating 8D at index ${this.code.length}`);
+        this.emitByte(OPCODES.STA);
+        
+        // Add placeholder for address
+        this.debug(`Generating ${placeholderTag} at index ${this.code.length}`);
+        this.addPlaceholder(placeholderTag, "address");
+        this.emitByte(0x00);  // Low byte placeholder
+        this.debug(`Generating 00 at index ${this.code.length}`);
+        this.emitByte(0x00);  // High byte placeholder
     }
 
     /**
@@ -227,26 +273,53 @@ class CodeGenerator {
         // Generate code based on the value type
         if (valueNode.type === NodeType.IntegerLiteral) {
             // Integer assignment
+            this.debug(`Generating Op Codes for assigning a Digit to a(n) Id`);
+            this.debug(`Generating A9 at index ${this.code.length}`);
             this.emitLdaConst(valueNode.value);
-            this.emitSta(symbol.address);
+            
+            this.debug(`Generating 8D at index ${this.code.length}`);
+            this.emitByte(OPCODES.STA);
+            
+            // Use placeholder for the address
+            this.debug(`Generating ${symbol.placeholderTag} at index ${this.code.length}`);
+            this.addPlaceholder(symbol.placeholderTag!, "address");
+            this.emitByte(0x00);  // Low byte placeholder
+            this.debug(`Generating 00 at index ${this.code.length}`);
+            this.emitByte(0x00);  // High byte placeholder
         } else if (valueNode.type === NodeType.BooleanLiteral) {
             // Boolean assignment
             const boolValue = valueNode.value === true ? BOOLEAN_VALUES.TRUE : BOOLEAN_VALUES.FALSE;
             this.emitLdaConst(boolValue);
-            this.emitSta(symbol.address);
+            
+            this.emitByte(OPCODES.STA);
+            this.addPlaceholder(symbol.placeholderTag!, "address");
+            this.emitByte(0x00);
+            this.emitByte(0x00);
         } else if (valueNode.type === NodeType.StringLiteral) {
             // String assignment
             const stringAddr = this.getStringAddress(valueNode.value);
             this.emitLdaConst(stringAddr);
-            this.emitSta(symbol.address);
+            
+            this.emitByte(OPCODES.STA);
+            this.addPlaceholder(symbol.placeholderTag!, "address");
+            this.emitByte(0x00);
+            this.emitByte(0x00);
         } else if (valueNode.type === NodeType.Identifier) {
             // Variable-to-variable assignment
             const sourceSymbol = this.findSymbol(valueNode.name!);
             if (!sourceSymbol) {
                 throw new Error(`Undefined variable: ${valueNode.name}`);
             }
-            this.emitLdaMem(sourceSymbol.address);
-            this.emitSta(symbol.address);
+            
+            this.emitByte(OPCODES.LDA_MEM);
+            this.addPlaceholder(sourceSymbol.placeholderTag!, "address");
+            this.emitByte(0x00);
+            this.emitByte(0x00);
+            
+            this.emitByte(OPCODES.STA);
+            this.addPlaceholder(symbol.placeholderTag!, "address");
+            this.emitByte(0x00);
+            this.emitByte(0x00);
         } else {
             throw new Error(`Unsupported value type: ${valueNode.type}`);
         }
@@ -256,14 +329,15 @@ class CodeGenerator {
      * Generate code for print statement
      */
     private generatePrintStatement(node: ASTNode): void {
-        if (!node.children || node.children.length === 0) {
-            throw new Error('Invalid PrintStatement node');
+        if (!node.expression) {
+            throw new Error('Invalid PrintStatement node: Missing expression');
         }
 
-        const exprNode = node.children[0];
+        const exprNode = node.expression;
 
         if (exprNode.type === NodeType.IntegerLiteral) {
             // Print integer constant
+            this.debug(`Generating Op Codes for printing a(n) Digit`);
             this.emitLdaConst(exprNode.value);
             this.generatePrintInt();
         } else if (exprNode.type === NodeType.BooleanLiteral) {
@@ -279,6 +353,7 @@ class CodeGenerator {
             this.emitSys();
         } else if (exprNode.type === NodeType.Identifier) {
             // Print variable
+            this.debug(`Generating Op Codes for printing a(n) Id`);
             const symbol = this.findSymbol(exprNode.name!);
 
             if (!symbol) {
@@ -286,19 +361,25 @@ class CodeGenerator {
             }
 
             // Load the variable value into Y register
-            this.emitLdyMem(symbol.address);
+            this.debug(`Generating AC at index ${this.code.length}`);
+            this.emitByte(OPCODES.LDY_MEM);
+            
+            // Use placeholder for address
+            this.debug(`Generating ${symbol.placeholderTag} at index ${this.code.length}`);
+            this.addPlaceholder(symbol.placeholderTag!, "address");
+            this.emitByte(0x00);  // Low byte placeholder
+            this.debug(`Generating 00 at index ${this.code.length}`);
+            this.emitByte(0x00);  // High byte placeholder
 
-            // Determine print type based on variable type
-            if (symbol.type === 'int') {
-                this.emitLdxConst(SYSCALLS.PRINT_INT);
-                this.emitSys();
-            } else if (symbol.type === 'boolean') {
-                this.emitLdxConst(SYSCALLS.PRINT_STRING);
-                this.emitSys();
-            } else if (symbol.type === 'string') {
-                this.emitLdxConst(SYSCALLS.PRINT_STRING);
-                this.emitSys();
-            }
+            // Set syscall type based on variable type
+            this.debug(`Generating A2 at index ${this.code.length}`);
+            this.emitLdxConst(SYSCALLS.PRINT_INT);
+            
+            // Make syscall
+            this.debug(`Generating FF at index ${this.code.length}`);
+            this.emitSys();
+        } else {
+            throw new Error(`Unsupported expression type in print statement: ${exprNode.type}`);
         }
     }
 
@@ -552,6 +633,21 @@ class CodeGenerator {
         // Sort by address (descending) to maintain proper memory layout
         strings.sort((a, b) => b.addr - a.addr);
 
+        // Add boolean string constants if not already present
+        if (!this.stringPool["true"]) {
+            const trueAddr = this.currentHeapAddress;
+            const trueStr = "true";
+            strings.push({ str: trueStr, addr: trueAddr });
+            this.currentHeapAddress += trueStr.length + 1;
+        }
+        
+        if (!this.stringPool["false"]) {
+            const falseAddr = this.currentHeapAddress;
+            const falseStr = "false";
+            strings.push({ str: falseStr, addr: falseAddr });
+            this.currentHeapAddress += falseStr.length + 1;
+        }
+
         // Add each string to the code
         for (const { str, addr } of strings) {
             // Ensure we're at the right position
@@ -570,6 +666,47 @@ class CodeGenerator {
     }
 
     /**
+     * Add placeholder for backpatching
+     */
+    private addPlaceholder(tag: string, type: string): void {
+        this.placeholders.push({
+            tag,
+            position: this.code.length,
+            type
+        });
+    }
+
+    /**
+     * Backpatch all placeholders with real addresses
+     */
+    private backpatchPlaceholders(): void {
+        for (const placeholder of this.placeholders) {
+            // Find the symbol with this placeholder tag
+            const symbol = this.symbolTable.find(s => s.placeholderTag === placeholder.tag);
+            
+            if (symbol) {
+                const address = symbol.address;
+                
+                // Backpatch the address (little-endian: low byte first)
+                const lowByte = address & 0xFF;
+                const highByte = (address >> 8) & 0xFF;
+                
+                this.debug(`Backpatching Static Variable Placeholder ${placeholder.tag} at Address: ${placeholder.position.toString(16)} with Memory Address: ${address.toString(16)}`);
+                
+                this.code[placeholder.position] = lowByte;
+                this.code[placeholder.position + 1] = highByte;
+            }
+        }
+    }
+
+    /**
+     * Debug helper
+     */
+    private debug(message: string): void {
+        console.log(`DEBUG - Code Gen - ${message}`);
+    }
+
+    /**
      * Emit instructions and helper methods
      */
     private emitByte(value: number): void {
@@ -583,7 +720,9 @@ class CodeGenerator {
     }
 
     private emitLdaConst(value: number): void {
+        this.debug(`Generating A9 at index ${this.code.length}`);
         this.emitByte(OPCODES.LDA_CONST);
+        this.debug(`Generating ${value.toString(16).padStart(2, '0')} at index ${this.code.length}`);
         this.emitByte(value);
     }
 

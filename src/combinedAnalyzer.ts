@@ -241,13 +241,36 @@ export class ASTAdapter {
         const typeNode = cstNode.children.find(c => c.name === 'Type');
         const identNode = cstNode.children.find(c => c.name === 'Identifier');
 
+        // Create children array with type and identifier nodes
+        const children: ASTNode[] = [];
+        
+        // Add type node
+        if (typeNode) {
+            children.push({
+                type: NodeType.Identifier,
+                name: this.getTypeFromNode(typeNode),
+                line: typeNode.token?.line || line,
+                column: typeNode.token?.column || column
+            });
+        }
+
+        // Add identifier node
+        if (identNode) {
+            children.push({
+                type: NodeType.Identifier,
+                name: identNode.token?.value || '',
+                line: identNode.token?.line || line,
+                column: identNode.token?.column || column
+            });
+        }
+
         return {
             type: NodeType.VarDeclaration,
             line,
             column,
+            children,
             varName: identNode?.token?.value || '',
-            varType: this.getTypeFromNode(typeNode),
-            initializer: null // Will be set during semantic analysis
+            varType: this.getTypeFromNode(typeNode)
         };
     }
 
