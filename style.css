@@ -303,28 +303,46 @@ tr:nth-child(even) {
 .tab-container {
     display: flex;
     margin-top: 10px;
+    justify-content: space-between;
+    width: 100%;
 }
 
 .tab {
-    padding: 10px 20px;
+    padding: 10px 0;
     background-color: #e9ecef;
     border: 1px solid #ccc;
     border-bottom: none;
     border-radius: 5px 5px 0 0;
     cursor: pointer;
-    margin-right: 5px;
+    flex: 1;
+    text-align: center;
+    margin-right: 0;
+    transition: background-color 0.3s;
 }
 
 .tab.active {
     background-color: #fff;
     font-weight: bold;
+    border-bottom: 1px solid #fff;
+    margin-bottom: -1px;
+}
+
+.tab:last-child {
+    margin-right: 0;
+}
+
+.tab:hover {
+    background-color: #d6d8db;
 }
 
 .tab-content {
     display: none;
     padding: 15px;
     border: 1px solid #ccc;
-    border-radius: 0 5px 5px 5px;
+    border-radius: 0 0 5px 5px;
+    background-color: white;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .tab-content.active {
@@ -354,4 +372,30 @@ tr:nth-child(even) {
     border-radius: 3px;
     overflow-x: auto;
     font-family: "Source Code Pro", serif;
+}
+
+/* Code Generation Output Styling */
+#machineCodeOutput {
+    width: 100%;
+    min-height: 200px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: "Source Code Pro", monospace;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    white-space: pre;
+    overflow-x: auto;
+    margin-bottom: 15px;
+    tab-size: 4;
+}
+
+/* Memory map styling */
+#memoryMapOutput {
+    background-color: #f0f0f0;
+    padding: 10px;
+    border-radius: 4px;
+    font-family: "Source Code Pro", monospace;
+    white-space: pre;
+    overflow-x: auto;
 }
