@@ -476,6 +476,11 @@ export class ASTAdapter {
      * Convert an Expression node
      */
     private static convertExpression(cstNode: CSTNode, line: number, column: number): ASTNode {
+        // First check for string expressions
+        if (cstNode.name === 'StringExpression') {
+            return this.convertStringExpression(cstNode, line, column);
+        }
+
         for (const child of cstNode.children) {
             if (child.name === 'Identifier' && child.token) {
                 return {
@@ -520,6 +525,9 @@ export class ASTAdapter {
                     column,
                     value: child.name === 'true'
                 };
+            } else if (child.name === 'StringExpression') {
+                // Handle string expressions
+                return this.convertStringExpression(child, line, column);
             }
         }
 
@@ -546,6 +554,16 @@ export class ASTAdapter {
                         line,
                         column,
                         value: value === 'true'
+                    };
+                }
+
+                // Check if it's a string (has quotes)
+                if (value.startsWith('"') || value.startsWith("'")) {
+                    return {
+                        type: NodeType.StringLiteral,
+                        line,
+                        column,
+                        value: value.replace(/^["']|["']$/g, '')
                     };
                 }
 
