@@ -6,13 +6,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CompiLinda</title>
     <link rel="stylesheet" href="style.css">
-    
+
     <!-- Module handling setup -->
     <script>
         // Create a global exports object that the scripts can modify
         var exports = {};
         var mainExports = {};
-        
+
         // Mock require function for browser compatibility
         var require = function (module) {
             if (module === './main') {
@@ -31,14 +31,14 @@
         window.mainExports = exports;
         exports = {};
     </script>
-    
+
     <script src="./dist/parser.js"></script>
     <script src="./dist/combinedAnalyzer.js"></script>
     <script>
         window.combinedAnalyzerExports = exports;
         exports = {};
     </script>
-    
+
     <script src="./dist/codeGeneration.js"></script>
 
     <script>
@@ -380,69 +380,62 @@
                                 semanticIssuesOutput.appendChild(successElement);
                             }
 
-                        // CODE GENERATION
-                        if (parseResult.ast && !parseResult.logs.some(log => log.level === 'ERROR') &&
-                            semanticResult.issues.length === 0) {
-                            try {
-                                // Create program section for code generation
-                                const codeGenProgramHeader = programHeader.cloneNode(true);
+                            // CODE GENERATION
+                            if (parseResult.ast && !parseResult.logs.some(log => log.level === 'ERROR') &&
+                                semanticResult.issues.length === 0) {
+                                try {
+                                    // Only proceed if there are no semantic errors
+                                    if (semanticResult && semanticResult.issues.length === 0) {
+                                        const codeGenerator = new CodeGenerator();
+                                        const machineCode = codeGenerator.generate(semanticResult.ast);
 
-                                // Only proceed if there are no semantic errors
-                                if (semanticResult && semanticResult.issues.length === 0) {
-                                    const codeGenerator = new CodeGenerator();
-                                    const machineCode = codeGenerator.generate(semanticResult.ast);
+                                        // Display machine code header
+                                        const machineHeader = document.createElement('h4');
+                                        machineHeader.textContent = `Program ${programNum} Machine Code`;
+                                        machineCodeOutput.parentNode.insertBefore(machineHeader, machineCodeOutput);
 
-                                    // Display machine code header
-                                    const machineHeader = document.createElement('h4');
-                                    machineHeader.textContent = `Program ${programNum} Machine Code`;
-                                    machineCodeOutput.appendChild(machineHeader);
+                                        // Display hex code - directly set the textarea value
+                                        const hexCode = codeGenerator.getHexCode();
+                                        machineCodeOutput.value = hexCode;
 
-                                    // Display hex code
-                                    
-                                    const hexCode = codeGenerator.getHexCode();
-                                    const hexCodeElement = document.createElement('machineCodeOutput');
-                                    hexCodeElement.textContent = hexCode;
-                                    machineCodeOutput.appendChild(hexCodeElement);
+                                        // Display memory map header
+                                        const memoryHeader = document.createElement('h4');
+                                        memoryHeader.textContent = `Program ${programNum} Memory Map`;
+                                        memoryMapOutput.appendChild(memoryHeader);
 
+                                        // Build memory map text
+                                        let memoryMapText = 'Static Variables:\n';
+                                        memoryMapText += '-----------------\n';
+                                        for (const [name, addr] of Object.entries(codeGenerator['staticTable'])) {
+                                            memoryMapText += `${name}: 0x${addr.toString(16).padStart(4, '0')}\n`;
+                                        }
 
-                                    // Display memory map header
-                                    const memoryHeader = document.createElement('h4');
-                                    memoryHeader.textContent = `Program ${programNum} Memory Map`;
-                                    memoryMapOutput.appendChild(memoryHeader);
+                                        memoryMapText += '\nString Constants:\n';
+                                        memoryMapText += '----------------\n';
+                                        for (const [str, addr] of Object.entries(codeGenerator['stringPool'])) {
+                                            memoryMapText += `"${str}": 0x${addr.toString(16).padStart(4, '0')}\n`;
+                                        }
 
-                                    // Build memory map text
-                                    let memoryMapText = 'Static Variables:\n';
-                                    memoryMapText += '-----------------\n';
-                                    for (const [name, addr] of Object.entries(codeGenerator['staticTable'])) {
-                                        memoryMapText += `${name}: 0x${addr.toString(16).padStart(4, '0')}\n`;
+                                        const memoryMapElement = document.createElement('pre');
+                                        memoryMapElement.textContent = memoryMapText;
+                                        memoryMapOutput.appendChild(memoryMapElement);
                                     }
+                                } catch (error) {
+                                    const errorElement = document.createElement('div');
+                                    errorElement.className = 'semantic-error';
+                                    errorElement.textContent = `Program ${programNum}: Code Generation Error - ${error.message}`;
+                                    codeGenStatusDiv.appendChild(errorElement);
 
-                                    memoryMapText += '\nString Constants:\n';
-                                    memoryMapText += '----------------\n';
-                                    for (const [str, addr] of Object.entries(codeGenerator['stringPool'])) {
-                                        memoryMapText += `"${str}": 0x${addr.toString(16).padStart(4, '0')}\n`;
-                                    }
-
-                                    const memoryMapElement = document.createElement('pre');
-                                    memoryMapElement.textContent = memoryMapText;
-                                    memoryMapOutput.appendChild(memoryMapElement);
+                                    allIssues.push({
+                                        program: programNum,
+                                        type: 'error',
+                                        message: `Code Generation: ${error.message}`,
+                                        line: 0,
+                                        column: 0
+                                    });
                                 }
-                            } catch (error) {
-                                const errorElement = document.createElement('div');
-                                errorElement.className = 'semantic-error';
-                                errorElement.textContent = `Program ${programNum}: Code Generation Error - ${error.message}`;
-                                codeGenStatusDiv.appendChild(errorElement);
-
-                                allIssues.push({
-                                    program: programNum,
-                                    type: 'error',
-                                    message: `Code Generation: ${error.message}`,
-                                    line: 0,
-                                    column: 0
-                                });
                             }
                         }
-                    }
 
                         // Collect lexer/parser errors
                         lexResult.logs.forEach(log => {

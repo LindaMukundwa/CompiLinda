@@ -376,7 +376,7 @@ tr:nth-child(even) {
 
 /* Code Generation Output Styling */
 #machineCodeOutput {
-    width: 100%;
+    width: 90%;
     min-height: 200px;
     padding: 10px;
     border: 1px solid #ddd;
@@ -388,6 +388,10 @@ tr:nth-child(even) {
     overflow-x: auto;
     margin-bottom: 15px;
     tab-size: 4;
+    resize: vertical;
+    line-height: 1.5;
+    word-wrap: break-word;
+    white-space: pre-wrap;
 }
 
 /* Memory map styling */
@@ -398,4 +402,5 @@ tr:nth-child(even) {
     font-family: "Source Code Pro", monospace;
     white-space: pre;
     overflow-x: auto;
+    font-size: 12px;
 }

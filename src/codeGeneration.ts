@@ -47,6 +47,11 @@ interface ASTNode {
     operator?: string;
     identifier?: ASTNode;
     expression?: ASTNode;
+    condition?: ASTNode;
+    thenBranch?: ASTNode;
+    elseBranch?: ASTNode;
+    left?: ASTNode;
+    right?: ASTNode;
 }
 
 // Define the structure for a symbol in the symbol table
@@ -387,15 +392,12 @@ class CodeGenerator {
      * Generate code for if statement
      */
     private generateIfStatement(node: ASTNode): void {
-        if (!node.children || node.children.length < 2) {
-            throw new Error('Invalid IfStatement node');
+        if (!node.condition || !node.thenBranch) {
+            throw new Error('Invalid IfStatement node: Missing condition or then branch');
         }
 
-        const conditionNode = node.children[0];
-        const bodyNode = node.children[1];
-
         // Generate condition code
-        this.generateComparisonCode(conditionNode);
+        this.generateComparisonCode(node.condition);
 
         // Store result in a temporary location
         const tempAddr = 0x0000;  // Using zero page for temporary storage
@@ -406,14 +408,26 @@ class CodeGenerator {
         this.emitCpx(tempAddr);
 
         // Calculate jump distance for skipping the body
-        const jumpDistance = this.calculateJumpDistance(bodyNode);
+        const jumpDistance = this.calculateJumpDistance(node.thenBranch);
 
         // If condition is false (Z flag set), skip the body
         this.emitByte(OPCODES.BNE);
         this.emitByte(0x05);  // Jump over the body code + jump instruction
 
         // Generate code for body
-        this.visit(bodyNode);
+        this.visit(node.thenBranch);
+
+        // Handle else branch if it exists
+        if (node.elseBranch) {
+            // Jump over the else branch
+            this.emitByte(OPCODES.LDA_CONST);
+            this.emitByte(0x01);  // Always true
+            this.emitByte(OPCODES.BNE);
+            this.emitByte(0x05);  // Jump over the else branch
+
+            // Generate code for else branch
+            this.visit(node.elseBranch);
+        }
     }
 
     /**
@@ -474,44 +488,45 @@ class CodeGenerator {
      * Generate code for comparison logic
      */
     private generateComparisonCode(node: ASTNode): void {
-        if (!node.children || node.children.length < 2) {
-            throw new Error('Invalid comparison node');
+        if (!node || node.type !== NodeType.BinaryExpression) {
+            throw new Error('Invalid comparison node: Expected BinaryExpression');
         }
 
-        const leftNode = node.children[0];
-        const rightNode = node.children[1];
+        if (!node.left || !node.right) {
+            throw new Error('Invalid comparison node: Missing left or right operand');
+        }
 
         // Get the left operand
-        if (leftNode.type === NodeType.Identifier) {
-            const symbol = this.findSymbol(leftNode.name!);
+        if (node.left.type === NodeType.Identifier) {
+            const symbol = this.findSymbol(node.left.name!);
             if (!symbol) {
-                throw new Error(`Undefined variable: ${leftNode.name}`);
+                throw new Error(`Undefined variable: ${node.left.name}`);
             }
             this.emitLdxMem(symbol.address);
-        } else if (leftNode.type === NodeType.IntegerLiteral) {
-            this.emitLdxConst(leftNode.value);
+        } else if (node.left.type === NodeType.IntegerLiteral) {
+            this.emitLdxConst(node.left.value);
         } else {
-            throw new Error(`Unsupported left operand type: ${leftNode.type}`);
+            throw new Error(`Unsupported left operand type: ${node.left.type}`);
         }
 
         // Get the right operand
-        if (rightNode.type === NodeType.Identifier) {
-            const symbol = this.findSymbol(rightNode.name!);
+        if (node.right.type === NodeType.Identifier) {
+            const symbol = this.findSymbol(node.right.name!);
             if (!symbol) {
-                throw new Error(`Undefined variable: ${rightNode.name}`);
+                throw new Error(`Undefined variable: ${node.right.name}`);
             }
             this.emitLdaConst(symbol.address);
-        } else if (rightNode.type === NodeType.IntegerLiteral) {
-            this.emitLdaConst(rightNode.value);
+        } else if (node.right.type === NodeType.IntegerLiteral) {
+            this.emitLdaConst(node.right.value);
         } else {
-            throw new Error(`Unsupported right operand type: ${rightNode.type}`);
+            throw new Error(`Unsupported right operand type: ${node.right.type}`);
         }
 
         // Compare X register with accumulator
         this.emitCpx(0x00);  // Compare with accumulator
 
         // Set result based on comparison
-        this.emitLdaConst(0x00);  // Default to false
+        this.emitLdaConst(0x00);
 
         // Check if this is an equality comparison
         if (node.operator === '==') {
