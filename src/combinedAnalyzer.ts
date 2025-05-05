@@ -411,22 +411,44 @@ export class ASTAdapter {
      * Convert a BooleanExpression node
      */
     private static convertBooleanExpression(cstNode: CSTNode, line: number, column: number): ASTNode {
+        console.log("Converting BooleanExpression:", this.debugNodeStructure(cstNode));
+        
         let left: ASTNode | null = null;
         let right: ASTNode | null = null;
         let operator = "=="; // Default
 
-        // Find the operands and operator
+        // First pass: find the operator
         for (const child of cstNode.children) {
-            if (child.name === 'Expression') {
-                if (!left) {
-                    left = this.convertNode(child);
-                } else {
-                    right = this.convertNode(child);
-                }
-            } else if (child.name === 'EqualsOp') {
+            if (child.name === 'EqualsOp') {
                 operator = "==";
             } else if (child.name === 'NotEqualsOp') {
                 operator = "!=";
+            }
+        }
+
+        // Second pass: find the operands
+        for (const child of cstNode.children) {
+            if (child.name === 'Identifier' && child.token) {
+                left = {
+                    type: NodeType.Identifier,
+                    name: child.token.value,
+                    line: child.token.line,
+                    column: child.token.column
+                };
+            } else if (child.name === 'IntLiteral' && child.token) {
+                right = {
+                    type: NodeType.IntegerLiteral,
+                    value: parseInt(child.token.value, 10),
+                    line: child.token.line,
+                    column: child.token.column
+                };
+            } else if (child.name === 'Expression') {
+                const converted = this.convertNode(child);
+                if (!left) {
+                    left = converted;
+                } else if (!right) {
+                    right = converted;
+                }
             }
         }
 

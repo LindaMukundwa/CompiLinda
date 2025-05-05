@@ -39,6 +39,12 @@ button:hover {
     display: none;
 }
 
+.error.success {
+    color: #28a745;
+    border-color: #28a745;
+    background-color: #e6ffed;
+}
+
 div#errorMessage.parse-success.semantic-success {
     color: green;
     margin: 10px 0;

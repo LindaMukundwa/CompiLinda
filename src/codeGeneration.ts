@@ -496,7 +496,7 @@ class CodeGenerator {
             throw new Error('Invalid comparison node: Missing left or right operand');
         }
 
-        // Get the left operand
+        // Get the left operand into X register
         if (node.left.type === NodeType.Identifier) {
             const symbol = this.findSymbol(node.left.name!);
             if (!symbol) {
@@ -509,13 +509,13 @@ class CodeGenerator {
             throw new Error(`Unsupported left operand type: ${node.left.type}`);
         }
 
-        // Get the right operand
+        // Get the right operand into accumulator
         if (node.right.type === NodeType.Identifier) {
             const symbol = this.findSymbol(node.right.name!);
             if (!symbol) {
                 throw new Error(`Undefined variable: ${node.right.name}`);
             }
-            this.emitLdaConst(symbol.address);
+            this.emitLdaMem(symbol.address);
         } else if (node.right.type === NodeType.IntegerLiteral) {
             this.emitLdaConst(node.right.value);
         } else {

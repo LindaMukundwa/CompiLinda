@@ -144,6 +144,10 @@
             document.getElementById('sourceCode').value = '';
             document.getElementById('errorMessage').textContent = '';
             document.getElementById('errorMessage').style.display = 'none';
+            //const errorDiv = document.getElementById('errorMessage');
+            //errorDiv.textContent = '';
+            //errorDiv.className = 'error'; // Reset to just error class
+            //errorDiv.style.display = 'none';
             document.getElementById('lexerOutput').innerHTML = '';
             document.getElementById('parseStatus').innerHTML = '';
             document.getElementById('cstDisplay').innerHTML = '';
@@ -495,12 +499,12 @@
                     errorDiv.className = 'error';
                 } else {
                     errorDiv.textContent = `All programs compiled successfully (${programSources.length} programs)`;
-                    errorDiv.className = 'success';
+                    errorDiv.className = 'error success';
                 }
                 errorDiv.style.display = 'block';
 
                 // Show semantic analyzer tab by default
-                showTab('semanticAnalyzer');
+                showTab('codeGenerator');
 
             } catch (globalError) {
                 console.error("Global error:", globalError);
