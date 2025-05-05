@@ -45,6 +45,81 @@ button:hover {
     background-color: #e6ffed;
 }
 
+/* Machine Code Container Styling */
+#machineCodeContainer, #memoryMapContainer {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* Program Machine Code Output */
+.program-machine-code {
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    background-color: #f9f9f9;
+}
+
+.program-machine-code h4 {
+    margin-top: 0;
+    color: #333;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+.program-machine-code textarea {
+    width: 90%;
+    min-height: 200px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: "Source Code Pro", monospace;
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    white-space: pre;
+    overflow-x: auto;
+    margin-bottom: 15px;
+    tab-size: 4;
+    resize: vertical;
+    line-height: 1.5;
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+/* Program Memory Map Output */
+.program-memory-map {
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    background-color: #f9f9f9;
+}
+
+.success {
+    color: #28a745;
+    margin: 10px 0;
+    padding: 10px;
+    border: 1px solid #28a745;
+    border-radius: 4px;
+    background-color: #e6ffed;
+    display: block;
+}
+
+.program-memory-map h4 {
+    margin-top: 0;
+    color: #333;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+.program-memory-map pre {
+    background-color: #f0f0f0;
+    padding: 10px;
+    border-radius: 4px;
+    margin: 0;
+    white-space: pre-wrap;
+}
+
 div#errorMessage.parse-success.semantic-success {
     color: green;
     margin: 10px 0;
@@ -409,4 +484,43 @@ tr:nth-child(even) {
     white-space: pre;
     overflow-x: auto;
     font-size: 12px;
+}
+
+/* Program Code Generation Styles */
+.program-codegen-container {
+    margin-bottom: 20px;
+    border: 1px solid #ddd;
+    padding: 15px;
+    border-radius: 5px;
+}
+
+.program-section {
+    margin-bottom: 20px;
+}
+
+.program-section h4 {
+    color: #333;
+    margin-bottom: 10px;
+    padding-bottom: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+.program-section .machine-code-output {
+    width: 100%;
+    min-height: 100px;
+    font-family: monospace;
+    padding: 10px;
+    margin-bottom: 15px;
+    background-color: #f8f8f8;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+}
+
+.program-section pre {
+    background-color: #f8f8f8;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    overflow-x: auto;
 }

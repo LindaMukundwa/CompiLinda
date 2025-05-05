@@ -889,17 +889,17 @@ export class Parser {
         }
         this.addChild(exprNode, firstTerm);
 
-        // Check for arithmetic operator (but not comparison operators)
-        if (this.match(TokenType.INT_OP)) {
+        // Keep parsing terms as long as we have arithmetic operators
+        while (this.match(TokenType.INT_OP)) {
             const opToken = this.consume(TokenType.INT_OP, "Expected arithmetic operator");
             if (opToken) {
                 // Add the operator to the expression
                 this.addChild(exprNode, this.createNode('Operator', opToken));
 
-                // Parse the second term
-                const secondTerm = this.parseTerm();
-                if (secondTerm) {
-                    this.addChild(exprNode, secondTerm);
+                // Parse the next term
+                const nextTerm = this.parseTerm();
+                if (nextTerm) {
+                    this.addChild(exprNode, nextTerm);
                 } else {
                     return null;
                 }

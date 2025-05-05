@@ -108,11 +108,11 @@
             <div class="codegen-sections">
                 <div class="codegen-section" style="flex: 2;">
                     <h3>Generated Machine Code</h3>
-                    <textarea id="machineCodeOutput" readonly></textarea>
+                    <div id="machineCodeContainer"></div> <!-- Container for multiple program outputs -->
                 </div>
                 <div class="codegen-section" style="flex: 1;">
                     <h3>Memory Map</h3>
-                    <pre id="memoryMapOutput"></pre>
+                    <div id="memoryMapContainer"></div> <!-- Container for multiple memory maps -->
                 </div>
             </div>
         </div>
@@ -154,6 +154,9 @@
             document.getElementById('semanticStatus').innerHTML = '';
             document.getElementById('symbolTableOutput').innerHTML = '';
             document.getElementById('semanticIssuesOutput').innerHTML = '';
+            document.getElementById('machineCodeContainer').innerHTML = '';
+            document.getElementById('memoryMapContainer').innerHTML = '';
+            document.getElementById('codeGenStatus').innerHTML = '';
         }
 
         // Function to ensure both Lexer and Parser are accessible
@@ -220,8 +223,8 @@
             const symbolTableOutput = document.getElementById('symbolTableOutput');
             const semanticIssuesOutput = document.getElementById('semanticIssuesOutput');
             const codeGenStatusDiv = document.getElementById('codeGenStatus');
-            const machineCodeOutput = document.getElementById('machineCodeOutput');
-            const memoryMapOutput = document.getElementById('memoryMapOutput');
+            const machineCodeContainer = document.getElementById('machineCodeContainer');
+const memoryMapContainer = document.getElementById('memoryMapContainer');
 
             // Clear previous outputs
             errorDiv.style.display = 'none';
@@ -233,8 +236,8 @@
             symbolTableOutput.innerHTML = '';
             semanticIssuesOutput.innerHTML = '';
             codeGenStatusDiv.innerHTML = '';
-            machineCodeOutput.innerHTML = '';
-            memoryMapOutput.innerHTML = '';
+            machineCodeContainer.innerHTML = '';
+            memoryMapContainer.innerHTML = '';
 
             try {
                 // Check dependencies first
@@ -390,21 +393,46 @@
                                 try {
                                     // Only proceed if there are no semantic errors (warnings are okay)
                                     const codeGenerator = new CodeGenerator();
-                                    const machineCode = codeGenerator.generate(semanticResult.ast);
+                                    const machineCodes = codeGenerator.generateMultiple([semanticResult.ast]);
+
+                                    // Create containers for this program's output
+                                    const machineCodeContainer = document.getElementById('machineCodeContainer');
+                                    const memoryMapContainer = document.getElementById('memoryMapContainer');
+
+                                    // Create wrapper div for this program's output
+                                    const programOutputWrapper = document.createElement('div');
+                                    programOutputWrapper.className = 'program-output-wrapper';
+
+                                    // Create machine code section
+                                    const machineCodeSection = document.createElement('div');
+                                    machineCodeSection.className = 'program-machine-code';
 
                                     // Display machine code header
                                     const machineHeader = document.createElement('h4');
                                     machineHeader.textContent = `Program ${programNum} Machine Code`;
-                                    machineCodeOutput.parentNode.insertBefore(machineHeader, machineCodeOutput);
+                                    machineCodeSection.appendChild(machineHeader);
 
-                                    // Display hex code - directly set the textarea value
-                                    const hexCode = codeGenerator.getHexCode();
-                                    machineCodeOutput.value = hexCode;
+                                    // Create textarea for machine code
+                                    const machineCodeTextarea = document.createElement('textarea');
+                                    machineCodeTextarea.readOnly = true;
+
+                                    // Set the hex code
+                                    const hexCode = machineCodes[0].map(byte =>
+                                        byte.toString(16).padStart(2, '0').toUpperCase()
+                                    ).join(' ');
+                                    machineCodeTextarea.value = hexCode;
+
+                                    machineCodeSection.appendChild(machineCodeTextarea);
+                                    programOutputWrapper.appendChild(machineCodeSection);
+
+                                    // Create memory map section
+                                    const memoryMapSection = document.createElement('div');
+                                    memoryMapSection.className = 'program-memory-map';
 
                                     // Display memory map header
                                     const memoryHeader = document.createElement('h4');
                                     memoryHeader.textContent = `Program ${programNum} Memory Map`;
-                                    memoryMapOutput.appendChild(memoryHeader);
+                                    memoryMapSection.appendChild(memoryHeader);
 
                                     // Build memory map text
                                     let memoryMapText = 'Static Variables:\n';
@@ -421,7 +449,13 @@
 
                                     const memoryMapElement = document.createElement('pre');
                                     memoryMapElement.textContent = memoryMapText;
-                                    memoryMapOutput.appendChild(memoryMapElement);
+                                    memoryMapSection.appendChild(memoryMapElement);
+
+                                    programOutputWrapper.appendChild(memoryMapSection);
+
+                                    // Add the wrapper to the containers
+                                    machineCodeContainer.appendChild(machineCodeSection);
+                                    memoryMapContainer.appendChild(memoryMapSection);
                                 } catch (error) {
                                     const errorElement = document.createElement('div');
                                     errorElement.className = 'semantic-error';
@@ -497,7 +531,7 @@
                     errorDiv.className = 'error';
                 } else {
                     errorDiv.textContent = `All programs compiled successfully (${programSources.length} programs)`;
-                    errorDiv.className = 'error success';
+                    errorDiv.className = 'success';
                 }
                 errorDiv.style.display = 'block';
 
