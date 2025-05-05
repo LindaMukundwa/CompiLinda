@@ -6,33 +6,40 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CompiLinda</title>
     <link rel="stylesheet" href="style.css">
-    <!-- Add this script tag to create a mock require function -->
+    
+    <!-- Module handling setup -->
     <script>
+        // Create a global exports object that the scripts can modify
+        var exports = {};
+        var mainExports = {};
+        
         // Mock require function for browser compatibility
         var require = function (module) {
             if (module === './main') {
                 return window.mainExports || {};
             }
+            if (module === './combinedAnalyzer') {
+                return window.combinedAnalyzerExports || {};
+            }
             return {};
         };
-
-        // Create a global exports object that the scripts can modify
-        var exports = {};
-        var mainExports = {};
     </script>
 
-    <!-- Load main.js first and store its exports -->
+    <!-- Load scripts in dependency order -->
     <script src="./dist/main.js"></script>
     <script>
         window.mainExports = exports;
         exports = {};
     </script>
-
-    <!-- Load scripts in dependency order -->
-    <script defer src="./dist/main.js"></script>
-    <script defer src="./dist/parser.js"></script>
-    <script defer src="./dist/combinedAnalyzer.js"></script>
-    <script defer src="./dist/codeGeneration.js"></script>
+    
+    <script src="./dist/parser.js"></script>
+    <script src="./dist/combinedAnalyzer.js"></script>
+    <script>
+        window.combinedAnalyzerExports = exports;
+        exports = {};
+    </script>
+    
+    <script src="./dist/codeGeneration.js"></script>
 
     <script>
         // Wait for all scripts to load
@@ -40,8 +47,8 @@
             console.log('All scripts loaded. Checking components:');
             console.log('- Lexer available:', typeof Lexer !== 'undefined');
             console.log('- Parser available:', typeof Parser !== 'undefined');
-            //console.log('- ASTAdapter available:', typeof ASTAdapter !== 'undefined');
             console.log('- SemanticAnalyzer available:', typeof SemanticAnalyzer !== 'undefined');
+            console.log('- CodeGenerator available:', typeof CodeGenerator !== 'undefined');
         });
     </script>
 </head>

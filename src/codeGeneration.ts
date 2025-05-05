@@ -45,7 +45,9 @@ interface ASTNode {
     children?: ASTNode[];
     line?: number;
     column?: number;
-    operator?: string; // Add operator property for binary expressions
+    operator?: string;
+    identifier?: ASTNode;
+    expression?: ASTNode;
 }
 
 // Define the structure for a symbol in the symbol table
@@ -204,12 +206,12 @@ class CodeGenerator {
      * Generate code for assignment statement
      */
     private generateAssignment(node: ASTNode): void {
-        if (!node.children || node.children.length < 2) {
+        if (!node.identifier || !node.expression) {
             throw new Error('Invalid AssignmentStatement node');
         }
 
-        const varName = node.children[0].name;
-        const valueNode = node.children[1];
+        const varName = node.identifier.name;
+        const valueNode = node.expression;
 
         if (!varName) {
             throw new Error('Variable name not found');

@@ -273,7 +273,12 @@ export class ASTAdapter {
             if (child.name === 'Identifier') {
                 identifier = this.convertNode(child);
             } else if (child.name === 'Expression' || child.name === 'StringExpression') {
-                expression = this.convertNode(child);
+                // For string expressions, we need to preserve the actual string value
+                if (child.name === 'StringExpression') {
+                    expression = this.convertStringExpression(child, line, column);
+                } else {
+                    expression = this.convertNode(child);
+                }
             }
         }
 
@@ -525,8 +530,12 @@ export class ASTAdapter {
     private static convertStringExpression(cstNode: CSTNode, line: number, column: number): ASTNode {
         let value = "";
     
-        // Build value from child character nodes
-        if (cstNode.children && cstNode.children.length > 0) {
+        // First check if there's a direct token value
+        if (cstNode.token?.value) {
+            // Remove quotes if present
+            value = cstNode.token.value.replace(/^["']|["']$/g, '');
+        } else if (cstNode.children && cstNode.children.length > 0) {
+            // Build value from child character nodes
             for (const child of cstNode.children) {
                 if (child.name === 'Char' && child.token?.value) {
                     value += child.token.value;
@@ -911,26 +920,30 @@ export class SemanticAnalyzer {
         // Mark as initialized
         this.markInitialized(name);
     
-        // Normalize variable and expression types for comparison
-        const symbolType = this.normalizeType(symbol.type);
-        
         // Get expression type based on node type
         let exprType: string;
         
         if (node.expression.type === NodeType.StringLiteral) {
-            console.log("Assigning string value:", node.expression.value);
             exprType = 'string';
         } else if (node.expression.type === NodeType.IntegerLiteral) {
             exprType = 'int';
         } else if (node.expression.type === NodeType.BooleanLiteral) {
             exprType = 'boolean';
+        } else if (node.expression.type === NodeType.Identifier) {
+            // For identifiers, get the type from the symbol table
+            const exprSymbol = this.getSymbol(node.expression.name);
+            if (!exprSymbol) {
+                this.addError(`Undefined variable '${node.expression.name}' in expression`, line, column);
+                return null;
+            }
+            exprType = exprSymbol.type;
         } else {
             // For other expressions, analyze recursively
             exprType = this.analyzeNode(node.expression) || 'unknown';
         }
         
-        // Compare normalized types
-        if (symbolType !== exprType) {
+        // Compare types
+        if (symbol.type !== exprType) {
             this.addError(
                 `Type mismatch in assignment: Cannot assign ${exprType} to ${symbol.type}`,
                 line, column
