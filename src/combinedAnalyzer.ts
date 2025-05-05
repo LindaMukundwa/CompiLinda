@@ -689,7 +689,6 @@ export class SemanticAnalyzer {
         issues: SemanticIssue[];
         ast: ASTNode | null;
         programNumber: number;
-        
     } {
         if (!this.ast) {
             this.addError("Failed to generate AST from parser output", 0, 0);
@@ -707,6 +706,7 @@ export class SemanticAnalyzer {
         // Check for any remaining unused variables in global scope
         this.checkForUnusedVariables(0);
 
+        // Only return empty symbol table if there are errors, not warnings
         const hasErrors = this.issues.some(issue => issue.type === 'error');
 
         return {

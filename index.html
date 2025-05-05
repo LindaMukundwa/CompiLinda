@@ -386,44 +386,42 @@
 
                             // CODE GENERATION
                             if (parseResult.ast && !parseResult.logs.some(log => log.level === 'ERROR') &&
-                                semanticResult.issues.length === 0) {
+                                semanticResult.issues.every(issue => issue.type !== 'error')) {
                                 try {
-                                    // Only proceed if there are no semantic errors
-                                    if (semanticResult && semanticResult.issues.length === 0) {
-                                        const codeGenerator = new CodeGenerator();
-                                        const machineCode = codeGenerator.generate(semanticResult.ast);
+                                    // Only proceed if there are no semantic errors (warnings are okay)
+                                    const codeGenerator = new CodeGenerator();
+                                    const machineCode = codeGenerator.generate(semanticResult.ast);
 
-                                        // Display machine code header
-                                        const machineHeader = document.createElement('h4');
-                                        machineHeader.textContent = `Program ${programNum} Machine Code`;
-                                        machineCodeOutput.parentNode.insertBefore(machineHeader, machineCodeOutput);
+                                    // Display machine code header
+                                    const machineHeader = document.createElement('h4');
+                                    machineHeader.textContent = `Program ${programNum} Machine Code`;
+                                    machineCodeOutput.parentNode.insertBefore(machineHeader, machineCodeOutput);
 
-                                        // Display hex code - directly set the textarea value
-                                        const hexCode = codeGenerator.getHexCode();
-                                        machineCodeOutput.value = hexCode;
+                                    // Display hex code - directly set the textarea value
+                                    const hexCode = codeGenerator.getHexCode();
+                                    machineCodeOutput.value = hexCode;
 
-                                        // Display memory map header
-                                        const memoryHeader = document.createElement('h4');
-                                        memoryHeader.textContent = `Program ${programNum} Memory Map`;
-                                        memoryMapOutput.appendChild(memoryHeader);
+                                    // Display memory map header
+                                    const memoryHeader = document.createElement('h4');
+                                    memoryHeader.textContent = `Program ${programNum} Memory Map`;
+                                    memoryMapOutput.appendChild(memoryHeader);
 
-                                        // Build memory map text
-                                        let memoryMapText = 'Static Variables:\n';
-                                        memoryMapText += '-----------------\n';
-                                        for (const [name, addr] of Object.entries(codeGenerator['staticTable'])) {
-                                            memoryMapText += `${name}: 0x${addr.toString(16).padStart(4, '0')}\n`;
-                                        }
-
-                                        memoryMapText += '\nString Constants:\n';
-                                        memoryMapText += '----------------\n';
-                                        for (const [str, addr] of Object.entries(codeGenerator['stringPool'])) {
-                                            memoryMapText += `"${str}": 0x${addr.toString(16).padStart(4, '0')}\n`;
-                                        }
-
-                                        const memoryMapElement = document.createElement('pre');
-                                        memoryMapElement.textContent = memoryMapText;
-                                        memoryMapOutput.appendChild(memoryMapElement);
+                                    // Build memory map text
+                                    let memoryMapText = 'Static Variables:\n';
+                                    memoryMapText += '-----------------\n';
+                                    for (const [name, addr] of Object.entries(codeGenerator['staticTable'])) {
+                                        memoryMapText += `${name}: 0x${addr.toString(16).padStart(4, '0')}\n`;
                                     }
+
+                                    memoryMapText += '\nString Constants:\n';
+                                    memoryMapText += '----------------\n';
+                                    for (const [str, addr] of Object.entries(codeGenerator['stringPool'])) {
+                                        memoryMapText += `"${str}": 0x${addr.toString(16).padStart(4, '0')}\n`;
+                                    }
+
+                                    const memoryMapElement = document.createElement('pre');
+                                    memoryMapElement.textContent = memoryMapText;
+                                    memoryMapOutput.appendChild(memoryMapElement);
                                 } catch (error) {
                                     const errorElement = document.createElement('div');
                                     errorElement.className = 'semantic-error';
