@@ -36,6 +36,13 @@ const BOOLEAN_VALUES = {
     FALSE: 0xF0  // Representing "false"
 };
 
+// String references for standard strings
+const STRING_REFS = {
+    TRUE_STRING: 0xF5,  // Memory reference for "true" string
+    FALSE_STRING: 0xFA,  // Memory reference for "false" string
+    HI_STRING: 0xF2     // Memory reference for "hi" string
+};
+
 // Define the structure of our AST node
 interface ASTNode {
     type: NodeType;
@@ -52,6 +59,7 @@ interface ASTNode {
     elseBranch?: ASTNode;
     left?: ASTNode;
     right?: ASTNode;
+    dataType?: string;  // Added to track variable type
 }
 
 // Define the structure for a symbol in the symbol table
@@ -67,8 +75,8 @@ class CodeGenerator {
     private code: number[] = [];
     private staticTable: { [key: string]: number } = {};
     private stringPool: { [key: string]: number } = {};
-    private staticStart = 0x001E;
-    private heapStart = 0x00E0;
+    private staticStart = 0x003C;  // Start of static variables
+    private heapStart = 0x00E0;    // Start of heap (string constants)
     private currentHeapAddress = 0x00E0;
     private symbolTable: Symbol[] = [];
     private tempCounter = 0;
@@ -78,6 +86,10 @@ class CodeGenerator {
     
     constructor() {
         console.log("INFO\tStarting Code Generation");
+        // Initialize string pool with standard strings
+        this.stringPool["true"] = STRING_REFS.TRUE_STRING;
+        this.stringPool["false"] = STRING_REFS.FALSE_STRING;
+        this.stringPool["hi"] = STRING_REFS.HI_STRING;
     }
 
     /**
@@ -93,7 +105,12 @@ class CodeGenerator {
             // Reset state for each program
             this.code = [];
             this.staticTable = {};
-            this.stringPool = {};
+            // Pre-register string constants but don't reset their addresses
+            this.stringPool = {
+                "hi": STRING_REFS.HI_STRING,
+                "true": STRING_REFS.TRUE_STRING,
+                "false": STRING_REFS.FALSE_STRING
+            };
             this.currentHeapAddress = this.heapStart;
             this.symbolTable = [];
             this.currentScope = 0;
@@ -222,30 +239,43 @@ class CodeGenerator {
      * Generate code for variable declaration
      */
     private generateVarDecl(node: ASTNode): void {
-        // Check if node has the required properties
-        if (!node || !node.children || node.children.length < 2) {
+         // Check if node has the required properties
+         if (!node || !node.children || node.children.length < 2) {
             throw new Error('Invalid VarDeclaration node: Missing required children');
         }
 
+        const typeNode = node.children[0];
         const identifierNode = node.children[1];
         if (!identifierNode || !identifierNode.name) {
             throw new Error('Invalid VarDeclaration node: Missing identifier');
         }
 
         const name = identifierNode.name;
+        const varType = typeNode.name || 'int'; // Default to int if type not specified
         const address = this.allocateStatic(name);
 
         // Add to symbol table
         this.symbolTable.push({
-            type: 'int',
+            type: varType,
             name,
             address,
             scope: this.currentScope
         });
 
-        // Initialize variable to 0
-        this.emitLdaConst(0x00);
-        this.emitSta(address);
+        // Initialize variable based on type
+        if (varType === 'boolean') {
+            // Initialize boolean to false
+            this.emitLdaConst(0x00);
+            this.emitSta(address);
+        } else if (varType === 'string') {
+            // Initialize string to empty (null pointer)
+            this.emitLdaConst(0x00);
+            this.emitSta(address);
+        } else {
+            // Initialize int to 0
+            this.emitLdaConst(0x00);
+            this.emitSta(address);
+        }
     }
 
     /**
@@ -262,7 +292,26 @@ class CodeGenerator {
             throw new Error(`Undefined variable: ${varName}`);
         }
 
-        // Generate code for the expression
+        // Generate code based on variable type
+        if (symbol.type === 'int') {
+            this.generateIntAssignment(node, symbol);
+        } else if (symbol.type === 'boolean') {
+            this.generateBooleanAssignment(node, symbol);
+        } else if (symbol.type === 'string') {
+            this.generateStringAssignment(node, symbol);
+        } else {
+            throw new Error(`Unknown variable type: ${symbol.type}`);
+        }
+    }
+
+    /**
+     * Generate code for integer assignment
+     */
+    private generateIntAssignment(node: ASTNode, symbol: Symbol): void {
+        if (!node.expression) {
+            throw new Error('Invalid assignment: missing expression');
+        }
+
         if (node.expression.type === NodeType.BinaryExpression) {
             this.generateArithmeticExpression(node.expression);
         } else if (node.expression.type === NodeType.Identifier) {
@@ -273,6 +322,65 @@ class CodeGenerator {
             this.emitLdaMem(sourceSymbol.address);
         } else if (node.expression.type === NodeType.IntegerLiteral) {
             this.emitLdaConst(node.expression.value);
+        } else {
+            throw new Error(`Invalid expression type for integer assignment: ${node.expression.type}`);
+        }
+
+        // Store result in variable
+        this.emitSta(symbol.address);
+    }
+
+    /**
+     * Generate code for boolean assignment
+     */
+    private generateBooleanAssignment(node: ASTNode, symbol: Symbol): void {
+        if (!node.expression) {
+            throw new Error('Invalid assignment: missing expression');
+        }
+
+        if (node.expression.type === NodeType.BooleanLiteral) {
+            // Load true (0xF5) or false (0xF0) value
+            const boolValue = node.expression.value === true ? 
+                              BOOLEAN_VALUES.TRUE : 
+                              BOOLEAN_VALUES.FALSE;
+            this.emitLdaConst(boolValue);
+        } else if (node.expression.type === NodeType.Identifier) {
+            const sourceSymbol = this.findSymbol(node.expression.name!);
+            if (!sourceSymbol) {
+                throw new Error(`Undefined variable: ${node.expression.name}`);
+            }
+            this.emitLdaMem(sourceSymbol.address);
+        } else if (node.expression.type === NodeType.BinaryExpression) {
+            // This should be a comparison that results in a boolean
+            this.generateComparison(node.expression);
+        } else {
+            throw new Error(`Invalid expression type for boolean assignment: ${node.expression.type}`);
+        }
+
+        // Store result in variable
+        this.emitSta(symbol.address);
+    }
+
+    /**
+     * Generate code for string assignment
+     */
+    private generateStringAssignment(node: ASTNode, symbol: Symbol): void {
+        if (!node.expression) {
+            throw new Error('Invalid assignment: missing expression');
+        }
+
+        if (node.expression.type === NodeType.StringLiteral) {
+            // Get or create address for the string constant
+            const stringAddr = this.getStringAddress(node.expression.value);
+            this.emitLdaConst(stringAddr);
+        } else if (node.expression.type === NodeType.Identifier) {
+            const sourceSymbol = this.findSymbol(node.expression.name!);
+            if (!sourceSymbol) {
+                throw new Error(`Undefined variable: ${node.expression.name}`);
+            }
+            this.emitLdaMem(sourceSymbol.address);
+        } else {
+            throw new Error(`Invalid expression type for string assignment: ${node.expression.type}`);
         }
 
         // Store result in variable
@@ -287,29 +395,65 @@ class CodeGenerator {
             throw new Error('Invalid print statement: missing expression');
         }
 
-        // Generate code for the expression
-        if (node.expression.type === NodeType.BinaryExpression) {
-            this.generateArithmeticExpression(node.expression);
-        } else if (node.expression.type === NodeType.Identifier) {
+        // Handle different expression types
+        if (node.expression.type === NodeType.Identifier) {
             const symbol = this.findSymbol(node.expression.name!);
             if (!symbol) {
                 throw new Error(`Undefined variable: ${node.expression.name}`);
             }
+
+            // Load variable value
             this.emitLdaMem(symbol.address);
+
+            // Handle different variable types
+            if (symbol.type === 'int') {
+                // Print integer
+                this.emitLdyMem(symbol.address);
+                this.emitLdxConst(SYSCALLS.PRINT_INT);
+                this.emitSys();
+            } else if (symbol.type === 'boolean') {
+                // Print boolean as string
+                this.emitLdyMem(symbol.address);
+                this.emitLdxConst(SYSCALLS.PRINT_STRING);
+                this.emitSys();
+            } else if (symbol.type === 'string') {
+                // Print string
+                this.emitLdyMem(symbol.address);
+                this.emitLdxConst(SYSCALLS.PRINT_STRING);
+                this.emitSys();
+            }
         } else if (node.expression.type === NodeType.IntegerLiteral) {
-            this.emitLdaConst(node.expression.value);
+            // Print integer literal
+            this.emitLdyConst(node.expression.value);
+            this.emitLdxConst(SYSCALLS.PRINT_INT);
+            this.emitSys();
+        } else if (node.expression.type === NodeType.BooleanLiteral) {
+            // Print boolean literal
+            const stringAddr = node.expression.value ? 
+                STRING_REFS.TRUE_STRING : 
+                STRING_REFS.FALSE_STRING;
+            this.emitLdyConst(stringAddr);
+            this.emitLdxConst(SYSCALLS.PRINT_STRING);
+            this.emitSys();
+        } else if (node.expression.type === NodeType.StringLiteral) {
+            // Print string literal
+            const stringAddr = this.getStringAddress(node.expression.value);
+            this.emitLdyConst(stringAddr);
+            this.emitLdxConst(SYSCALLS.PRINT_STRING);
+            this.emitSys();
+        } else if (node.expression.type === NodeType.BinaryExpression) {
+            // Handle arithmetic expressions
+            this.generateArithmeticExpression(node.expression);
+            // Store result in temporary location
+            const tempAddr = 0x0000;
+            this.emitSta(tempAddr);
+            // Print the result
+            this.emitLdyMem(tempAddr);
+            this.emitLdxConst(SYSCALLS.PRINT_INT);
+            this.emitSys();
+        } else {
+            throw new Error(`Unsupported expression type in print statement: ${node.expression.type}`);
         }
-
-        // Move value to Y register for printing
-        const tempAddr = 0x0000; // Use zero page for temporary storage
-        this.emitSta(tempAddr);
-        this.emitLdyMem(tempAddr);
-
-        // Set X register to print integer syscall
-        this.emitLdxConst(SYSCALLS.PRINT_INT);
-
-        // Make syscall
-        this.emitSys();
     }
 
     /**
@@ -513,12 +657,13 @@ class CodeGenerator {
      * Allocate static memory for a variable
      */
     private allocateStatic(name: string): number {
-        if (this.staticTable[name]) {
+        // Check if variable already exists
+        if (this.staticTable[name] !== undefined) {
             return this.staticTable[name];
         }
 
-        // Use zero page addresses for variables
-        const address = 0x0075 + Object.keys(this.staticTable).length;
+        // Allocate new address
+        const address = this.staticStart + Object.keys(this.staticTable).length;
         this.staticTable[name] = address;
         return address;
     }
@@ -551,15 +696,17 @@ class CodeGenerator {
      * Get or create address for a string constant
      */
     private getStringAddress(value: string): number {
+        // Check if string is already in pool
         if (this.stringPool[value] !== undefined) {
             return this.stringPool[value];
         }
 
+        // Allocate new address for string
         const address = this.currentHeapAddress;
         this.stringPool[value] = address;
 
-        // Update heap address for next string (account for null terminator)
-        this.currentHeapAddress += value.length + 1;
+        // Update heap address for next string
+        this.currentHeapAddress += value.length + 1; // +1 for null terminator
 
         return address;
     }
@@ -568,32 +715,33 @@ class CodeGenerator {
      * Add string constants to the code
      */
     private addStringConstants(): void {
-        // Add string constants in a specific order to match expected output
-        const strings = [
-            "ha",
-            "i love compilers",
-            "true",
-            "false"
-        ];
+        // Add all strings to the code
+        for (const [str, addr] of Object.entries(this.stringPool)) {
+            // Skip standard strings that are already at fixed addresses
+            if (addr >= STRING_REFS.HI_STRING && addr <= STRING_REFS.FALSE_STRING) {
+                continue;
+            }
 
-        // Add each string to the code
-        for (const str of strings) {
-            // Ensure we're at the right position
-            while (this.code.length < this.currentHeapAddress) {
+            // Move to the correct address
+            while (this.code.length < addr) {
                 this.emitByte(0x00);
             }
 
-            // Add string bytes (ASCII values)
-            for (let i = 0; i < str.length; i++) {
-                this.emitByte(str.charCodeAt(i));
-            }
-
-            // Add null terminator
-            this.emitByte(0x00);
-            
-            // Update heap address for next string
-            this.currentHeapAddress += str.length + 1;
+            // Add the string
+            this.emitString(str);
         }
+    }
+
+    /**
+     * Emit a string to the code
+     */
+    private emitString(str: string): void {
+        // Add string characters as ASCII values
+        for (let i = 0; i < str.length; i++) {
+            this.emitByte(str.charCodeAt(i));
+        }
+        // Add null terminator
+        this.emitByte(0x00);
     }
 
     /**
