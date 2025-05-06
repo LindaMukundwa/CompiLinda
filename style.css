@@ -67,6 +67,11 @@ button:hover {
     border-bottom: 1px solid #eee;
 }
 
+.test-case-selector {
+    font-family: "Source Code Pro", monospace;
+    font-size: small;
+}
+
 .program-machine-code textarea {
     width: 90%;
     min-height: 200px;
